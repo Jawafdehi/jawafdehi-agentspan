@@ -9,11 +9,13 @@ from agentspan.agents import tool
 
 from jawafdehi_agentspan.assets import ciaa_workflow_root
 from jawafdehi_agentspan.dependencies import (
+    ensure_within_global_store,
     ensure_within_workspace,
     get_dependencies,
 )
 from jawafdehi_agentspan.models import CaseInitialization, PublishInput, SourceBundle
-from jawafdehi_agentspan.workspace import build_case_initialization
+from jawafdehi_agentspan.settings import get_settings
+from jawafdehi_agentspan.workspace import build_case_initialization, global_store_root
 
 
 def _run_async(awaitable):
@@ -27,9 +29,21 @@ def _workspace_root(workspace_root: str) -> Path:
     return path
 
 
+def _global_store_root() -> Path:
+    root = global_store_root(get_settings())
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
 def _validate_workspace_path(path: str, workspace_root: str) -> Path:
     resolved = Path(path).resolve()
     ensure_within_workspace(_workspace_root(workspace_root), resolved)
+    return resolved
+
+
+def _validate_global_path(path: str) -> Path:
+    resolved = Path(path).resolve()
+    ensure_within_global_store(_global_store_root(), resolved)
     return resolved
 
 
@@ -40,9 +54,9 @@ def list_workspace_files(workspace_root: str, pattern: str = "**/*") -> list[str
 
 
 @tool(isolated=False)
-def read_workspace_file(file_path: str, workspace_root: str) -> str:
-    path = _validate_workspace_path(file_path, workspace_root)
-    return path.read_text(encoding="utf-8")
+def list_global_source_files(pattern: str = "**/*") -> list[str]:
+    root = _global_store_root()
+    return [str(path) for path in sorted(root.glob(pattern)) if path.is_file()]
 
 
 @tool(isolated=False)
@@ -50,7 +64,7 @@ def read_reference_file(file_path: str, workspace_root: str) -> str:
     path = Path(file_path).resolve()
     try:
         ensure_within_workspace(_workspace_root(workspace_root), path)
-    except ValueError:
+    except RuntimeError:
         workflow_root = ciaa_workflow_root().resolve()
         package_root = Path(__file__).resolve().parent
         if not path.is_relative_to(workflow_root) and not path.is_relative_to(
@@ -69,8 +83,25 @@ def write_workspace_file(file_path: str, content: str, workspace_root: str) -> s
 
 
 @tool(isolated=False)
+def write_global_source_file(file_path: str, content: str) -> str:
+    path = _validate_global_path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+@tool(isolated=False)
 def append_workspace_file(file_path: str, content: str, workspace_root: str) -> str:
     path = _validate_workspace_path(file_path, workspace_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(content)
+    return str(path)
+
+
+@tool(isolated=False)
+def append_global_source_file(file_path: str, content: str) -> str:
+    path = _validate_global_path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(content)

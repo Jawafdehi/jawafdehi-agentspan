@@ -5,7 +5,6 @@ from typing import Any
 
 from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
 from jawafdehi_agentspan.models import (
-    DocumentSourceType,
     PublishedCaseResult,
     PublishInput,
 )
@@ -79,37 +78,24 @@ class MCPPublishFinalizer:
         self, publish_input: PublishInput
     ) -> list[dict[str, str]]:
         uploaded: list[dict[str, str]] = []
-        for source in publish_input.source_bundle.workspace.sources:
+        for source in publish_input.source_bundle.source_artifacts:
             source_type = "OFFICIAL_GOVERNMENT"
-            if source.type == DocumentSourceType.CHARGE_SHEET:
+            file_path = source.raw_path
+            if source.source_type == "charge_sheet":
                 source_type = "LEGAL_PROCEDURAL"
-            payload = await self.adapter.upload_document_source(
-                {
-                    "title": source.name,
-                    "description": f"{publish_input.case_number} source document",
-                    "file_path": str(source.raw),
-                    "source_type": source_type,
-                }
-            )
-            uploaded.append(
-                {
-                    "source_id": str(
-                        payload["source_id"]
-                        if "source_id" in payload
-                        else payload["id"]
-                    )
-                }
-            )
-        for artifact in publish_input.source_bundle.news_artifacts:
+            elif source.source_type == "news":
+                source_type = "MEDIA_NEWS"
+                file_path = source.markdown_path
             arguments = {
-                "title": artifact.title,
-                "description": f"{publish_input.case_number} news coverage",
-                "file_path": str(artifact.markdown_path),
-                "source_type": "MEDIA_NEWS",
-                "url": [artifact.external_url] if artifact.external_url else [],
+                "title": source.title,
+                "description": f"{publish_input.case_number} source document",
+                "file_path": str(file_path),
+                "source_type": source_type,
             }
-            if artifact.publication_date:
-                arguments["publication_date"] = artifact.publication_date
+            if source.external_url:
+                arguments["url"] = [source.external_url]
+            if source.publication_date:
+                arguments["publication_date"] = source.publication_date
             payload = await self.adapter.upload_document_source(arguments)
             uploaded.append(
                 {

@@ -13,13 +13,17 @@ from jawafdehi_agentspan.models import (
 )
 from jawafdehi_agentspan.settings import Settings
 from jawafdehi_agentspan.tools import (
+    append_global_source_file,
     brave_search,
     convert_to_markdown,
     fetch_url,
     gather_news_step,
     gather_sources_step,
     initialize_casework_step,
+    list_global_source_files,
+    list_workspace_files,
     publish_case_step,
+    write_global_source_file,
 )
 
 _HERE = Path(__file__).parent
@@ -86,11 +90,11 @@ def build_draft_agent(settings: Settings) -> Agent:
             _load("drafter.md"),
             _load("case-template.md"),
             (
-                "Draft a complete Nepali Jawafdehi case using the provided "
-                "instructions, template, and source documents. "
-                "Return only the final Markdown document text. "
-                "Do not wrap it in code fences and do not leave placeholders. "
-                "Do not attempt to read files, write files, or call any tools."
+                "Source documents are not embedded inline. Some live in the run "
+                "workspace and others live in the global source store. Use the "
+                "provided source manifest plus the default filesystem read tool to "
+                "inspect source files as needed, including specific lines when "
+                "helpful. Prefer markdown files over raw files."
             ),
         ]
     )
@@ -98,6 +102,12 @@ def build_draft_agent(settings: Settings) -> Agent:
         name="ciaa_drafter",
         model=settings.llm_model,
         instructions=instructions,
+        tools=[
+            list_workspace_files,
+            list_global_source_files,
+            write_global_source_file,
+            append_global_source_file,
+        ],
         max_turns=2,
     )
 
@@ -107,15 +117,11 @@ def build_review_agent(settings: Settings) -> Agent:
         [
             _load("reviewer.md"),
             (
-                "Review the provided draft against the source documents, "
-                "instructions, and template. "
-                "All content is provided inline in the prompt - do not use "
-                "any tools or read any files. "
-                "Write a thorough review covering factual accuracy, "
-                "completeness, and publishability. "
-                "Include an overall score (1-10) and a clear recommendation: "
-                "approved / approved_with_minor_edits / needs_revision / "
-                "blocked."
+                "Source documents are not embedded inline. Some live in the run "
+                "workspace and others live in the global source store. Use the "
+                "provided source manifest plus the default filesystem read tool to "
+                "inspect source files as needed, including specific lines when "
+                "helpful. Prefer markdown files over raw files."
             ),
         ]
     )
@@ -123,6 +129,10 @@ def build_review_agent(settings: Settings) -> Agent:
         name="ciaa_reviewer",
         model=settings.llm_model,
         instructions=instructions,
+        tools=[
+            list_workspace_files,
+            list_global_source_files,
+        ],
         max_turns=2,
     )
 

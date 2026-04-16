@@ -33,25 +33,11 @@ ACCEPTED_REVIEW_OUTCOMES = {
 }
 
 
-class DocumentSourceType(str, Enum):
-    CIAA_PRESS_RELEASE = "CIAA_PRESS_RELEASE"
-    CHARGE_SHEET = "CHARGE_SHEET"
-    OTHER = "OTHER"
-
-
-class DocumentSource(BaseModel):
-    name: str
-    type: DocumentSourceType
-    raw: Path
-    markdown: Path
-
-
 class WorkspaceContext(BaseModel):
     root_dir: Path
     logs_dir: Path
     data_dir: Path
     memory_file: Path
-    sources: list[DocumentSource] = Field(default_factory=list)
 
 
 class CaseInitialization(BaseModel):
@@ -85,18 +71,11 @@ class SourceBundle(BaseModel):
     workspace: WorkspaceContext
     asset_root: Path
     case_details_path: Path
+    source_artifacts: list[SourceArtifact] = Field(default_factory=list)
     case_details_artifact: SourceArtifact | None = None
     press_release_artifact: SourceArtifact | None = None
     charge_sheet_artifact: SourceArtifact | None = None
     news_artifacts: list[SourceArtifact] = Field(default_factory=list)
-
-
-class DraftInput(BaseModel):
-    case_number: str
-    workspace: WorkspaceContext
-    asset_root: Path
-    case_details_path: Path
-    sources: list[DocumentSource] = Field(default_factory=list)
 
 
 class Critique(BaseModel):

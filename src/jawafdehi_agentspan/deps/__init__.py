@@ -11,6 +11,7 @@ from jawafdehi_agentspan.deps.news_gatherer import SearchBackedNewsGatherer
 from jawafdehi_agentspan.deps.publish_finalizer import MCPPublishFinalizer
 from jawafdehi_agentspan.deps.source_gatherer import WorkspaceSourceGatherer
 from jawafdehi_agentspan.deps.utils import (
+    ensure_within_global_store,
     ensure_within_workspace,
     ensure_within_workspace_or_assets,
     render_review_markdown,
@@ -18,6 +19,7 @@ from jawafdehi_agentspan.deps.utils import (
 
 __all__ = [
     "BraveSearchClient",
+    "ensure_within_global_store",
     "MCPPublishFinalizer",
     "RemoteDocumentFetcher",
     "SearchBackedNewsGatherer",

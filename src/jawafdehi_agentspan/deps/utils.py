@@ -6,10 +6,23 @@ from typing import Any
 from jawafdehi_agentspan.assets import ciaa_workflow_root
 
 
-def ensure_within_workspace(workspace_root: Path, path: Path) -> None:
-    resolved_root = workspace_root.resolve()
+def ensure_within_directory(root: Path, path: Path, *, label: str) -> None:
+    resolved_root = root.resolve()
     resolved_path = path.resolve()
-    resolved_path.relative_to(resolved_root)
+    try:
+        resolved_path.relative_to(resolved_root)
+    except ValueError as err:
+        raise RuntimeError(
+            f"Path is outside the allowed {label} root: {path}"
+        ) from err
+
+
+def ensure_within_workspace(workspace_root: Path, path: Path) -> None:
+    ensure_within_directory(workspace_root, path, label="workspace")
+
+
+def ensure_within_global_store(global_store_root: Path, path: Path) -> None:
+    ensure_within_directory(global_store_root, path, label="global store")
 
 
 def ensure_within_workspace_or_assets(path: Path) -> None:

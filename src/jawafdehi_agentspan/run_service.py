@@ -28,10 +28,6 @@ from jawafdehi_agentspan.workspace import build_case_initialization, create_work
 
 logger = logging.getLogger(__name__)
 
-ORCHESTRATOR_SOURCE_CHAR_LIMIT = 50000
-CHARGE_SHEET_CHAR_LIMIT = 70000
-STANDARD_SOURCE_CHAR_LIMIT = 20000
-
 
 def _validate_required_output(path: Path) -> None:
     if not path.is_file():
@@ -177,75 +173,20 @@ class RunService:
             self.dependencies.publish_finalizer.publish_and_finalize(publish_input)
         )
 
-    @staticmethod
-    def _read_text(path: Path) -> str:
-        return path.read_text(encoding="utf-8").strip()
-
     @classmethod
-    def _condense_text(cls, content: str, max_chars: int | None) -> str:
-        if max_chars is None or len(content) <= max_chars:
-            return content
-        head = max_chars * 3 // 4
-        tail = max_chars - head
-        return (
-            f"{content[:head].rstrip()}\n\n"
-            f"[TRUNCATED {len(content) - max_chars} CHARACTERS]\n\n"
-            f"{content[-tail:].lstrip()}"
-        )
-
-    @classmethod
-    def _format_document_block(
-        cls,
-        label: str,
-        path: Path,
-        *,
-        max_chars: int | None = None,
-    ) -> str:
-        content = cls._read_text(path)
-        content = cls._condense_text(content, max_chars)
-        return f"## {label}\nPath: {path}\n<document>\n{content}\n</document>"
-
-    @classmethod
-    def _select_source_char_limit(cls, path: Path) -> int:
-        if "charge-sheet" in path.name:
-            return CHARGE_SHEET_CHAR_LIMIT
-        return STANDARD_SOURCE_CHAR_LIMIT
-
-    @classmethod
-    def _format_source_documents(
-        cls,
-        source_bundle: SourceBundle,
-        *,
-        total_limit: int,
-    ) -> str:
+    def _format_source_manifest(cls, source_bundle: SourceBundle) -> str:
         blocks: list[str] = []
-        remaining = total_limit
-        for source in source_bundle.workspace.sources:
-            if remaining <= 0:
-                break
-            path = source.markdown
-            source_limit = min(cls._select_source_char_limit(path), remaining)
+        for artifact in source_bundle.source_artifacts:
             blocks.append(
-                cls._format_document_block(
-                    source.name,
-                    path,
-                    max_chars=source_limit,
+                "\n".join(
+                    [
+                        f"## {artifact.title}",
+                        f"Source type: {artifact.source_type}",
+                        f"Raw path: {artifact.raw_path}",
+                        f"Markdown path: {artifact.markdown_path}",
+                    ]
                 )
             )
-            remaining -= source_limit
-        for artifact in source_bundle.news_artifacts:
-            if remaining <= 0:
-                break
-            path = artifact.markdown_path
-            source_limit = min(cls._select_source_char_limit(path), remaining)
-            blocks.append(
-                cls._format_document_block(
-                    artifact.title,
-                    path,
-                    max_chars=source_limit,
-                )
-            )
-            remaining -= source_limit
         return "\n\n".join(blocks)
 
     @classmethod
@@ -255,20 +196,22 @@ class RunService:
         case_number: str,
         source_bundle: SourceBundle,
     ) -> str:
-        source_documents = cls._format_source_documents(
-            source_bundle, total_limit=ORCHESTRATOR_SOURCE_CHAR_LIMIT
-        )
+        source_manifest = cls._format_source_manifest(source_bundle)
         return (
             f"Case number: {case_number}\n\n"
             "Run the complete drafting-and-refinement workflow in one "
             "orchestrated pass.\n"
             "Case initialization, source gathering, and news gathering are "
             "already complete before this prompt.\n"
-            "Start from the provided source documents only, then draft, "
+            "Source documents may live in the run workspace or the global "
+            "source store. Use the source manifest below and the appropriate "
+            "workspace/global file tools to read them.\n"
+            "Start from the available source documents only, then draft, "
             "review, extract critique, and optionally revise once before "
             "re-reviewing.\n"
             "Prefer primary source facts, avoid unsupported claims, and keep "
             "the final draft publishable in Nepali markdown.\n"
             "Return the final structured orchestrated refinement output only.\n\n"
-            f"{source_documents}"
+            "## Source Manifest\n\n"
+            f"{source_manifest}"
         )

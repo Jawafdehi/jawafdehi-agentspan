@@ -8,8 +8,6 @@ from jawafdehi_agentspan.assets import ciaa_workflow_root
 from jawafdehi_agentspan.models import (
     CaseInitialization,
     Critique,
-    DocumentSource,
-    DocumentSourceType,
     OrchestratedRefinementOutput,
     PublishedCaseResult,
     ReviewOutcome,
@@ -27,8 +25,6 @@ def _workspace(tmp_path: Path) -> WorkspaceContext:
     logs_dir = root / "logs"
     data_dir = root / "data"
     memory_file = root / "MEMORY.md"
-    (root / "sources" / "raw").mkdir(parents=True)
-    (root / "sources" / "markdown").mkdir(parents=True)
     logs_dir.mkdir(parents=True)
     data_dir.mkdir(parents=True)
     memory_file.write_text("# MEMORY\n", encoding="utf-8")
@@ -44,7 +40,7 @@ def _initialization(
     tmp_path: Path, case_number: str = "081-CR-0046"
 ) -> CaseInitialization:
     workspace = _workspace(tmp_path)
-    case_details_path = workspace.root_dir / f"case_details-{case_number}.md"
+    case_details_path = workspace.data_dir / f"case_details-{case_number}.md"
     case_details_path.write_text(
         "# Case Details\n\n- **Ram Bahadur Karki**\n", encoding="utf-8"
     )
@@ -59,33 +55,40 @@ def _initialization(
 
 def _source_bundle(initialization: CaseInitialization) -> SourceBundle:
     raw_path = (
-        initialization.workspace.root_dir / "sources" / "raw" / "charge-sheet.pdf"
+        initialization.workspace.root_dir.parent
+        / "global_store"
+        / "cases"
+        / initialization.case_number
+        / "sources"
+        / "raw"
+        / "charge-sheet.pdf"
     )
     markdown_path = (
-        initialization.workspace.root_dir / "sources" / "markdown" / "charge-sheet.md"
+        initialization.workspace.root_dir.parent
+        / "global_store"
+        / "cases"
+        / initialization.case_number
+        / "sources"
+        / "markdown"
+        / "charge-sheet.md"
     )
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    markdown_path.parent.mkdir(parents=True, exist_ok=True)
     raw_path.write_text("raw", encoding="utf-8")
     markdown_path.write_text("# Charge Sheet\n", encoding="utf-8")
-    document_source = DocumentSource(
-        name="Charge Sheet",
-        type=DocumentSourceType.CHARGE_SHEET,
-        raw=raw_path,
-        markdown=markdown_path,
-    )
-    workspace = initialization.workspace.model_copy(
-        update={"sources": [document_source]}
+    artifact = SourceArtifact(
+        source_type="charge_sheet",
+        title="Charge Sheet",
+        raw_path=raw_path,
+        markdown_path=markdown_path,
     )
     return SourceBundle(
         case_number=initialization.case_number,
-        workspace=workspace,
+        workspace=initialization.workspace,
         asset_root=initialization.asset_root,
         case_details_path=initialization.case_details_path,
-        charge_sheet_artifact=SourceArtifact(
-            source_type="charge_sheet",
-            title="Charge Sheet",
-            raw_path=raw_path,
-            markdown_path=markdown_path,
-        ),
+        source_artifacts=[artifact],
+        charge_sheet_artifact=artifact,
     )
 
 
@@ -235,6 +238,7 @@ def test_run_service_happy_path(tmp_path: Path):
     assert isinstance(result, WorkflowResult)
     assert result.published is True
     assert result.case_id == 7
+    assert initialization.case_details_path.parent == initialization.workspace.data_dir
 
 
 def test_run_service_revises_once_then_publishes(tmp_path: Path):

@@ -6,6 +6,8 @@ and publishability.
 All source documents and the draft are provided inline in the prompt. Do not attempt to
 read files, write files, or call any tools.
 
+Review the provided draft against the source documents, instructions, and template. All content is provided inline in the prompt - do not use any tools or read any files. Write a thorough review covering factual accuracy, completeness, and publishability. Include an overall score (1-10) and a clear recommendation: approved / approved_with_minor_edits / needs_revision / blocked.
+
 ### What to check
 
 **Factual accuracy**
@@ -46,3 +48,4 @@ or if the draft is fundamentally unusable.
 Use `needs_revision` if there are significant gaps or inaccuracies that can be fixed.
 Use `approved_with_minor_edits` if the draft is mostly good with small fixable issues.
 Use `approved` if the draft is ready to publish as-is.
+

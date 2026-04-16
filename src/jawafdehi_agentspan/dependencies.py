@@ -9,6 +9,7 @@ from jawafdehi_agentspan.deps import (
     SearchBackedNewsGatherer,
     WorkflowDependencies,
     WorkspaceSourceGatherer,
+    ensure_within_global_store,
     build_default_dependencies,
     ensure_within_workspace,
     ensure_within_workspace_or_assets,
@@ -19,6 +20,7 @@ from jawafdehi_agentspan.deps import (
 
 __all__ = [
     "BraveSearchClient",
+    "ensure_within_global_store",
     "MCPPublishFinalizer",
     "RemoteDocumentFetcher",
     "SearchBackedNewsGatherer",

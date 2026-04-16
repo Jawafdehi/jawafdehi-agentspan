@@ -13,12 +13,14 @@ from jawafdehi_agentspan.deps.fetcher import RemoteDocumentFetcher
 from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
 from jawafdehi_agentspan.models import (
     CaseInitialization,
-    DocumentSource,
-    DocumentSourceType,
     SourceArtifact,
     SourceBundle,
 )
-from jawafdehi_agentspan.workspace import markdown_sources_dir, raw_sources_dir
+from jawafdehi_agentspan.workspace import (
+    ensure_case_store_dirs,
+    global_markdown_sources_dir,
+    global_raw_sources_dir,
+)
 
 
 class WorkspaceSourceGatherer:
@@ -32,67 +34,34 @@ class WorkspaceSourceGatherer:
         self.fetcher = fetcher or RemoteDocumentFetcher()
 
     def _base_bundle(self, initialization: CaseInitialization) -> SourceBundle:
-        raw_case_details_path = (
-            raw_sources_dir(initialization.workspace.root_dir)
-            / "special-court-case-details.txt"
-        )
-        markdown_case_details_path = (
-            markdown_sources_dir(initialization.workspace.root_dir)
-            / "special-court-case-details.md"
-        )
-        case_details = initialization.case_details_path.read_text(encoding="utf-8")
-        raw_case_details_path.write_text(case_details, encoding="utf-8")
-        markdown_case_details_path.write_text(case_details, encoding="utf-8")
-        document_source = DocumentSource(
-            name="Special Court case details",
-            type=DocumentSourceType.OTHER,
-            raw=raw_case_details_path,
-            markdown=markdown_case_details_path,
-        )
-        workspace = initialization.workspace.model_copy(
-            update={"sources": [document_source]}
+        ensure_case_store_dirs(initialization.case_number)
+        artifact = SourceArtifact(
+            source_type="case_details",
+            title="Special Court case details",
+            raw_path=initialization.case_details_path,
+            markdown_path=initialization.case_details_path,
         )
         return SourceBundle(
             case_number=initialization.case_number,
-            workspace=workspace,
+            workspace=initialization.workspace,
             asset_root=initialization.asset_root,
             case_details_path=initialization.case_details_path,
-            case_details_artifact=SourceArtifact(
-                source_type="case_details",
-                title="Special Court case details",
-                raw_path=raw_case_details_path,
-                markdown_path=markdown_case_details_path,
-            ),
-        )
-
-    @staticmethod
-    def _artifact_to_document_source(artifact: SourceArtifact) -> DocumentSource:
-        source_type = DocumentSourceType.OTHER
-        if artifact.source_type == "press_release":
-            source_type = DocumentSourceType.CIAA_PRESS_RELEASE
-        elif artifact.source_type == "charge_sheet":
-            source_type = DocumentSourceType.CHARGE_SHEET
-        return DocumentSource(
-            name=artifact.title,
-            type=source_type,
-            raw=artifact.raw_path,
-            markdown=artifact.markdown_path,
+            source_artifacts=[artifact],
+            case_details_artifact=artifact,
         )
 
     @classmethod
     def _append_artifact(
         cls, bundle: SourceBundle, artifact: SourceArtifact
     ) -> SourceBundle:
-        sources = list(bundle.workspace.sources)
-        document_source = cls._artifact_to_document_source(artifact)
+        artifacts = list(bundle.source_artifacts)
         if all(
-            source.raw != document_source.raw
-            or source.markdown != document_source.markdown
-            for source in sources
+            existing.raw_path != artifact.raw_path
+            or existing.markdown_path != artifact.markdown_path
+            for existing in artifacts
         ):
-            sources.append(document_source)
-        workspace = bundle.workspace.model_copy(update={"sources": sources})
-        updates: dict[str, Any] = {"workspace": workspace}
+            artifacts.append(artifact)
+        updates: dict[str, Any] = {"source_artifacts": artifacts}
         if artifact.source_type == "press_release":
             updates["press_release_artifact"] = artifact
         if artifact.source_type == "charge_sheet":
@@ -168,11 +137,11 @@ class WorkspaceSourceGatherer:
             press_url = (press_row.get("source_url") or "").strip()
             if press_url:
                 raw_path = (
-                    raw_sources_dir(initialization.workspace.root_dir)
+                    global_raw_sources_dir(initialization.case_number)
                     / f"ciaa-press-release-{press_id}.html"
                 )
                 markdown_path = (
-                    markdown_sources_dir(initialization.workspace.root_dir)
+                    global_markdown_sources_dir(initialization.case_number)
                     / f"ciaa-press-release-{press_id}.md"
                 )
                 await self.fetcher.download(press_url, raw_path)
@@ -203,11 +172,11 @@ class WorkspaceSourceGatherer:
             )
         raw_path = await self.fetcher.download_with_detected_extension(
             pdf_url,
-            raw_sources_dir(initialization.workspace.root_dir)
+            global_raw_sources_dir(initialization.case_number)
             / f"charge-sheet-{initialization.case_number}",
         )
         markdown_path = (
-            markdown_sources_dir(initialization.workspace.root_dir)
+            global_markdown_sources_dir(initialization.case_number)
             / f"charge-sheet-{initialization.case_number}.md"
         )
         await self._convert_to_markdown(raw_path, markdown_path)

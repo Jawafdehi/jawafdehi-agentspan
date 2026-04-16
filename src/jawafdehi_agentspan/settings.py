@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,14 @@ class Settings(BaseSettings):
     agentspan_auth_key: str | None = Field(default=None, alias="AGENTSPAN_AUTH_KEY")
     agentspan_auth_secret: str | None = Field(
         default=None, alias="AGENTSPAN_AUTH_SECRET"
+    )
+    global_store_root: Path = Field(
+        default_factory=lambda: Path.cwd() / "global_store",
+        alias="GLOBAL_STORE_ROOT",
+    )
+    runs_root: Path = Field(
+        default_factory=lambda: Path.cwd() / "runs",
+        alias="RUNS_ROOT",
     )
 
 
