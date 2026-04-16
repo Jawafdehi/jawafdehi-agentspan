@@ -7,12 +7,8 @@ def ciaa_workflow_root() -> Path:
     return Path(__file__).resolve().parents[2] / "assets" / "ciaa_caseworker"
 
 
-def ciaa_instructions_path() -> Path:
-    return ciaa_workflow_root() / "instructions" / "INSTRUCTIONS.md"
-
-
 def ciaa_case_template_path() -> Path:
-    return ciaa_workflow_root() / "instructions" / "case-template.md"
+    return Path(__file__).resolve().parent / "agents" / "case-template.md"
 
 
 def ciaa_ag_index_path() -> Path:

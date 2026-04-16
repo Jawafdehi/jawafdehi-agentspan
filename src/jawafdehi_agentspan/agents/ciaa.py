@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from agentspan.agents import Agent
 
 from jawafdehi_agentspan.models import (
@@ -20,6 +22,12 @@ from jawafdehi_agentspan.tools import (
     publish_case_step,
 )
 
+_HERE = Path(__file__).parent
+
+
+def _load(filename: str) -> str:
+    return (_HERE / filename).read_text(encoding="utf-8").strip()
+
 
 def build_initialize_agent(settings: Settings) -> Agent:
     return Agent(
@@ -34,7 +42,7 @@ def build_initialize_agent(settings: Settings) -> Agent:
         tools=[initialize_casework_step],
         required_tools=["initialize_casework_step"],
         output_type=CaseInitialization,
-        max_turns=4,
+        max_turns=2,
     )
 
 
@@ -51,7 +59,7 @@ def build_source_agent(settings: Settings) -> Agent:
         tools=[gather_sources_step],
         required_tools=["gather_sources_step"],
         output_type=SourceBundle,
-        max_turns=4,
+        max_turns=2,
     )
 
 
@@ -68,39 +76,53 @@ def build_news_agent(settings: Settings) -> Agent:
         tools=[gather_news_step, brave_search, fetch_url, convert_to_markdown],
         required_tools=["gather_news_step"],
         output_type=SourceBundle,
-        max_turns=6,
+        max_turns=2,
     )
 
 
 def build_draft_agent(settings: Settings) -> Agent:
+    instructions = "\n\n".join(
+        [
+            _load("drafter.md"),
+            _load("case-template.md"),
+            (
+                "Draft a complete Nepali Jawafdehi case using the provided "
+                "instructions, template, and source documents. "
+                "Return only the final Markdown document text. "
+                "Do not wrap it in code fences and do not leave placeholders. "
+                "Do not attempt to read files, write files, or call any tools."
+            ),
+        ]
+    )
     return Agent(
         name="ciaa_drafter",
         model=settings.llm_model,
-        instructions=(
-            "Draft a complete Nepali Jawafdehi case using the provided "
-            "instructions, template, and source documents. "
-            "Return only the final Markdown document text. "
-            "Do not wrap it in code fences and do not leave placeholders."
-        ),
-        max_turns=8,
+        instructions=instructions,
+        max_turns=2,
     )
 
 
 def build_review_agent(settings: Settings) -> Agent:
+    instructions = "\n\n".join(
+        [
+            _load("reviewer.md"),
+            (
+                "Review the provided draft against the source documents, "
+                "instructions, and template. "
+                "All content is provided inline in the prompt - do not use "
+                "any tools or read any files. "
+                "Write a thorough review covering factual accuracy, "
+                "completeness, and publishability. "
+                "Include an overall score (1-10) and a clear recommendation: "
+                "approved / approved_with_minor_edits / needs_revision / "
+                "blocked."
+            ),
+        ]
+    )
     return Agent(
         name="ciaa_reviewer",
         model=settings.llm_model,
-        instructions=(
-            "Review the provided draft against the source documents, "
-            "instructions, and template. "
-            "All content is provided inline in the prompt - do not use "
-            "any tools or read any files. "
-            "Write a thorough review covering factual accuracy, "
-            "completeness, and publishability. "
-            "Include an overall score (1-10) and a clear recommendation: "
-            "approved / approved_with_minor_edits / needs_revision / "
-            "blocked."
-        ),
+        instructions=instructions,
         max_turns=2,
     )
 
@@ -136,18 +158,24 @@ def build_critique_extractor(settings: Settings) -> Agent:
 
 
 def build_revise_agent(settings: Settings) -> Agent:
+    instructions = "\n\n".join(
+        [
+            _load("reviser.md"),
+            (
+                "Revise the provided draft to address every critical and major "
+                "issue, plus straightforward minor ones. "
+                "All content is provided inline in the prompt - do not attempt "
+                "to read files or call any tools. "
+                "Return only the improved Nepali Markdown draft text, without "
+                "code fences."
+            ),
+        ]
+    )
     return Agent(
         name="ciaa_reviser",
         model=settings.llm_model,
-        instructions=(
-            "Revise the provided draft to address every critical and major "
-            "issue, plus straightforward minor ones. "
-            "All content is provided inline in the prompt - do not attempt "
-            "to read files or call any tools. "
-            "Return only the improved Nepali Markdown draft text, without "
-            "code fences."
-        ),
-        max_turns=6,
+        instructions=instructions,
+        max_turns=2,
     )
 
 
@@ -164,7 +192,7 @@ def build_publish_agent(settings: Settings) -> Agent:
         tools=[publish_case_step],
         required_tools=["publish_case_step"],
         output_type=PublishedCaseResult,
-        max_turns=8,
+        max_turns=2,
     )
 
 
@@ -203,5 +231,5 @@ def build_refinement_orchestrator(settings: Settings) -> Agent:
         ],
         strategy="handoff",
         output_type=OrchestratedRefinementOutput,
-        max_turns=18,
+        max_turns=6,
     )

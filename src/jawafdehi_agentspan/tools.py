@@ -51,7 +51,12 @@ def read_reference_file(file_path: str, workspace_root: str) -> str:
     try:
         ensure_within_workspace(_workspace_root(workspace_root), path)
     except ValueError:
-        path.relative_to(ciaa_workflow_root().resolve())
+        workflow_root = ciaa_workflow_root().resolve()
+        package_root = Path(__file__).resolve().parent
+        if not path.is_relative_to(workflow_root) and not path.is_relative_to(
+            package_root
+        ):
+            raise
     return path.read_text(encoding="utf-8")
 
 

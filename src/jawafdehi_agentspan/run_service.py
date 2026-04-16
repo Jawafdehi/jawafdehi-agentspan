@@ -29,8 +29,6 @@ from jawafdehi_agentspan.workspace import build_case_initialization, create_work
 logger = logging.getLogger(__name__)
 
 ORCHESTRATOR_SOURCE_CHAR_LIMIT = 50000
-ORCHESTRATOR_INSTRUCTIONS_CHAR_LIMIT = 4000
-ORCHESTRATOR_TEMPLATE_CHAR_LIMIT = 12000
 CHARGE_SHEET_CHAR_LIMIT = 70000
 STANDARD_SOURCE_CHAR_LIMIT = 20000
 
@@ -93,10 +91,7 @@ class RunService:
             build_refinement_orchestrator(self.settings),
             self._build_refinement_orchestrator_prompt(
                 case_number=case_input.case_number,
-                initialization=initialization,
                 source_bundle=source_bundle,
-                draft_path=draft_path,
-                review_path=review_path,
             ),
             output_type=OrchestratedRefinementOutput,
         )
@@ -258,32 +253,13 @@ class RunService:
         cls,
         *,
         case_number: str,
-        initialization: CaseInitialization,
         source_bundle: SourceBundle,
-        draft_path: Path,
-        review_path: Path,
     ) -> str:
-        instructions_path = (
-            initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
-        )
-        template_path = initialization.asset_root / "instructions" / "case-template.md"
-        instructions_block = cls._format_document_block(
-            "Workflow Instructions",
-            instructions_path,
-            max_chars=ORCHESTRATOR_INSTRUCTIONS_CHAR_LIMIT,
-        )
-        template_block = cls._format_document_block(
-            "Case Template",
-            template_path,
-            max_chars=ORCHESTRATOR_TEMPLATE_CHAR_LIMIT,
-        )
         source_documents = cls._format_source_documents(
             source_bundle, total_limit=ORCHESTRATOR_SOURCE_CHAR_LIMIT
         )
         return (
-            f"Case number: {case_number}\n"
-            f"Destination draft path: {draft_path}\n"
-            f"Destination review path: {review_path}\n\n"
+            f"Case number: {case_number}\n\n"
             "Run the complete drafting-and-refinement workflow in one "
             "orchestrated pass.\n"
             "Case initialization, source gathering, and news gathering are "
@@ -294,7 +270,5 @@ class RunService:
             "Prefer primary source facts, avoid unsupported claims, and keep "
             "the final draft publishable in Nepali markdown.\n"
             "Return the final structured orchestrated refinement output only.\n\n"
-            f"{instructions_block}\n\n"
-            f"{template_block}\n\n"
             f"{source_documents}"
         )
