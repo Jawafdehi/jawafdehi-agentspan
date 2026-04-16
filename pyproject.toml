@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "jawaf-span"
+version = "0.1.0"
+description = "AgentSpan-based CIAA caseworker service for Jawafdehi workflows"
+authors = ["Jawafdehi Inquiry <inquiry@jawafdehi.org>"]
+readme = "README.md"
+packages = [{include = "jawaf_span", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+agentspan = "0.1.5"
+pydantic = "^2.12.5"
+pydantic-settings = "^2.11.0"
+typer = "^0.16.0"
+httpx = "^0.28.1"
+markitdown = {extras = ["docx", "pdf", "pptx", "xlsx"], version = "^0.1.5"}
+jawafdehi-mcp = {path = "../jawafdehi-mcp", develop = true}
+
+[tool.poetry.group.dev.dependencies]
+hypothesis = "^6.148.2"
+pytest = "^9.0.1"
+pytest-asyncio = "^1.3.0"
+black = "^26.3.0"
+ruff = "^0.15.5"
+
+[tool.poetry.scripts]
+jawaf = "jawaf_span.cli:main"
+
+[tool.pytest.ini_options]
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
