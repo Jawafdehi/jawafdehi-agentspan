@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
 from jawafdehi_agentspan.models import CaseInitialization, WorkspaceContext
 
 
@@ -49,16 +49,33 @@ def create_workspace(case_number: str) -> WorkspaceContext:
     return build_workspace_context(root_dir)
 
 
+async def _fetch_case_details(
+    adapter: MCPToolAdapter, case_number: str, output_path: Path
+) -> str:
+    result = await adapter.call_text(
+        "ngm_extract_case_data",
+        {
+            "court_identifier": "special",
+            "case_number": case_number,
+            "file_path": str(output_path),
+        },
+    )
+    msg = result.lower()
+    if "429" in msg or "too many requests" in msg or "rate limit" in msg:
+        raise RuntimeError(f"NGM API rate-limited for {case_number}: {result}")
+    return output_path.read_text(encoding="utf-8")
+
+
 def build_case_initialization(
     case_number: str,
     workspace_root: Path,
-    fetch_case_details: Callable[[str, Path], Awaitable[str]],
+    adapter: MCPToolAdapter,
     *,
     asset_root: Path,
 ) -> CaseInitialization:
     workspace = build_workspace_context(workspace_root)
     case_details_path = workspace.root_dir / f"case_details-{case_number}.md"
-    content = asyncio.run(fetch_case_details(case_number, case_details_path))
+    content = asyncio.run(_fetch_case_details(adapter, case_number, case_details_path))
     summary_path = workspace.logs_dir / "case-summary.md"
     summary_path.write_text(
         f"# Case Summary\n\n- Case number: {case_number}\n\n{content[:1200]}\n",

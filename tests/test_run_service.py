@@ -8,6 +8,8 @@ from jawafdehi_agentspan.assets import ciaa_workflow_root
 from jawafdehi_agentspan.models import (
     CaseInitialization,
     Critique,
+    DocumentSource,
+    DocumentSourceType,
     OrchestratedRefinementOutput,
     PublishedCaseResult,
     ReviewOutcome,
@@ -24,11 +26,9 @@ def _workspace(tmp_path: Path) -> WorkspaceContext:
     root = tmp_path / "run"
     logs_dir = root / "logs"
     data_dir = root / "data"
-    sources_raw_dir = root / "sources" / "raw"
-    sources_markdown_dir = root / "sources" / "markdown"
     memory_file = root / "MEMORY.md"
-    sources_raw_dir.mkdir(parents=True)
-    sources_markdown_dir.mkdir(parents=True)
+    (root / "sources" / "raw").mkdir(parents=True)
+    (root / "sources" / "markdown").mkdir(parents=True)
     logs_dir.mkdir(parents=True)
     data_dir.mkdir(parents=True)
     memory_file.write_text("# MEMORY\n", encoding="utf-8")
@@ -36,8 +36,6 @@ def _workspace(tmp_path: Path) -> WorkspaceContext:
         root_dir=root,
         logs_dir=logs_dir,
         data_dir=data_dir,
-        sources_raw_dir=sources_raw_dir,
-        sources_markdown_dir=sources_markdown_dir,
         memory_file=memory_file,
     )
 
@@ -60,17 +58,28 @@ def _initialization(
 
 
 def _source_bundle(initialization: CaseInitialization) -> SourceBundle:
-    raw_path = initialization.workspace.sources_raw_dir / "charge-sheet.pdf"
-    markdown_path = initialization.workspace.sources_markdown_dir / "charge-sheet.md"
+    raw_path = (
+        initialization.workspace.root_dir / "sources" / "raw" / "charge-sheet.pdf"
+    )
+    markdown_path = (
+        initialization.workspace.root_dir / "sources" / "markdown" / "charge-sheet.md"
+    )
     raw_path.write_text("raw", encoding="utf-8")
     markdown_path.write_text("# Charge Sheet\n", encoding="utf-8")
+    document_source = DocumentSource(
+        name="Charge Sheet",
+        type=DocumentSourceType.CHARGE_SHEET,
+        raw=raw_path,
+        markdown=markdown_path,
+    )
+    workspace = initialization.workspace.model_copy(
+        update={"sources": [document_source]}
+    )
     return SourceBundle(
         case_number=initialization.case_number,
-        workspace=initialization.workspace,
+        workspace=workspace,
         asset_root=initialization.asset_root,
         case_details_path=initialization.case_details_path,
-        raw_sources=[raw_path],
-        markdown_sources=[markdown_path],
         charge_sheet_artifact=SourceArtifact(
             source_type="charge_sheet",
             title="Charge Sheet",
@@ -141,11 +150,14 @@ class FakeExecutor:
         raise AssertionError(f"Unexpected agent {agent.name}")
 
 
-class FakeNGMClient:
-    async def fetch_case_details(self, case_number: str, output_path: Path) -> str:
-        content = "# Case Details\n\n- **Ram Bahadur Karki**\n"
-        output_path.write_text(content, encoding="utf-8")
-        return content
+class FakeAdapter:
+    async def call_text(self, tool_name: str, arguments: dict) -> str:
+        if tool_name == "ngm_extract_case_data":
+            output_path = Path(arguments["file_path"])
+            content = "# Case Details\n\n- **Ram Bahadur Karki**\n"
+            output_path.write_text(content, encoding="utf-8")
+            return content
+        raise AssertionError(f"Unexpected call_text: {tool_name}")
 
 
 class FakeSourceGatherer:
@@ -179,7 +191,7 @@ class FakePublishFinalizer:
 
 class FakeDependencies:
     def __init__(self, source_bundle: SourceBundle, publish_case_id: int) -> None:
-        self.ngm_client = FakeNGMClient()
+        self.adapter = FakeAdapter()
         self.source_gatherer = FakeSourceGatherer(source_bundle)
         self.news_gatherer = FakeNewsGatherer(source_bundle)
         self.publish_finalizer = FakePublishFinalizer(publish_case_id)

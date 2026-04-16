@@ -43,16 +43,6 @@ class MCPToolAdapter:
             raise RuntimeError(f"Unknown MCP tool: {tool_name}")
         return self._json_payload(await tool.execute(arguments))
 
-    async def ngm_extract_case_data(self, arguments: dict[str, Any]) -> str:
-        result = await self.call_text("ngm_extract_case_data", arguments)
-        try:
-            payload = json.loads(result)
-            if isinstance(payload, dict) and not payload.get("success", True):
-                raise RuntimeError(str(payload.get("error", result)))
-        except json.JSONDecodeError:
-            pass
-        return result
-
     async def convert_to_markdown(self, arguments: dict[str, Any]) -> str:
         text = await self.call_text("convert_to_markdown", arguments)
         if text.startswith("Error:"):

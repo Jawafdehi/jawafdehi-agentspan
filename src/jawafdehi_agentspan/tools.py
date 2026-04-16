@@ -95,12 +95,13 @@ def ngm_extract_case_data(
 ) -> str:
     path = _validate_workspace_path(file_path, workspace_root)
     return _run_async(
-        get_dependencies().adapter.ngm_extract_case_data(
+        get_dependencies().adapter.call_text(
+            "ngm_extract_case_data",
             {
                 "court_identifier": court_identifier,
                 "case_number": case_number,
                 "file_path": str(path),
-            }
+            },
         )
     )
 
@@ -121,7 +122,7 @@ def initialize_casework_step(case_number: str, workspace_root: str) -> dict[str,
     initialization = build_case_initialization(
         case_number,
         _workspace_root(workspace_root),
-        get_dependencies().ngm_client.fetch_case_details,
+        get_dependencies().adapter,
         asset_root=ciaa_workflow_root(),
     )
     return json.loads(initialization.model_dump_json())

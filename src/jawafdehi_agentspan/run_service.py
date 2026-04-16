@@ -28,9 +28,6 @@ from jawafdehi_agentspan.workspace import build_case_initialization, create_work
 
 logger = logging.getLogger(__name__)
 
-DRAFT_SOURCE_CHAR_LIMIT = 120000
-REVIEW_SOURCE_CHAR_LIMIT = 140000
-REVISION_SOURCE_CHAR_LIMIT = 140000
 ORCHESTRATOR_SOURCE_CHAR_LIMIT = 50000
 ORCHESTRATOR_INSTRUCTIONS_CHAR_LIMIT = 4000
 ORCHESTRATOR_TEMPLATE_CHAR_LIMIT = 12000
@@ -168,7 +165,7 @@ class RunService:
         return build_case_initialization(
             case_number,
             workspace_root,
-            self.dependencies.ngm_client.fetch_case_details,
+            self.dependencies.adapter,
             asset_root=ciaa_workflow_root(),
         )
 
@@ -255,105 +252,6 @@ class RunService:
             )
             remaining -= source_limit
         return "\n\n".join(blocks)
-
-    @classmethod
-    def _build_draft_prompt(
-        cls,
-        *,
-        case_number: str,
-        draft_path: Path,
-        initialization: CaseInitialization,
-        source_bundle: SourceBundle,
-    ) -> str:
-        instructions_path = (
-            initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
-        )
-        template_path = initialization.asset_root / "instructions" / "case-template.md"
-        instructions_block = cls._format_document_block(
-            "Workflow Instructions", instructions_path
-        )
-        template_block = cls._format_document_block("Case Template", template_path)
-        source_documents = cls._format_source_documents(
-            source_bundle, total_limit=DRAFT_SOURCE_CHAR_LIMIT
-        )
-        return (
-            f"Case number: {case_number}\n"
-            f"Destination draft path: {draft_path}\n\n"
-            "Prepare a complete Nepali Jawafdehi case draft.\n"
-            "Follow the workflow instructions and template closely, "
-            "reconcile the source documents, and produce a publishable "
-            "draft in Markdown.\n\n"
-            f"{instructions_block}\n\n"
-            f"{template_block}\n\n"
-            f"{source_documents}"
-        )
-
-    @classmethod
-    def _build_review_prompt(
-        cls,
-        *,
-        case_number: str,
-        initialization: CaseInitialization,
-        source_bundle: SourceBundle,
-        draft_path: Path,
-    ) -> str:
-        instructions_path = (
-            initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
-        )
-        template_path = initialization.asset_root / "instructions" / "case-template.md"
-        instructions_block = cls._format_document_block(
-            "Workflow Instructions", instructions_path
-        )
-        template_block = cls._format_document_block("Case Template", template_path)
-        draft_block = cls._format_document_block("Current Draft", draft_path)
-        source_documents = cls._format_source_documents(
-            source_bundle, total_limit=REVIEW_SOURCE_CHAR_LIMIT
-        )
-        return (
-            f"Case number: {case_number}\n\n"
-            "Review this draft for factual grounding, completeness, and "
-            "publishability.\n"
-            "Be strict about unsupported claims and missing key facts.\n\n"
-            f"{instructions_block}\n\n"
-            f"{template_block}\n\n"
-            f"{draft_block}\n\n"
-            f"{source_documents}"
-        )
-
-    @classmethod
-    def _build_revision_prompt(
-        cls,
-        *,
-        case_number: str,
-        initialization: CaseInitialization,
-        source_bundle: SourceBundle,
-        draft_path: Path,
-        review_path: Path,
-    ) -> str:
-        instructions_path = (
-            initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
-        )
-        template_path = initialization.asset_root / "instructions" / "case-template.md"
-        instructions_block = cls._format_document_block(
-            "Workflow Instructions", instructions_path
-        )
-        template_block = cls._format_document_block("Case Template", template_path)
-        draft_block = cls._format_document_block("Current Draft", draft_path)
-        review_block = cls._format_document_block("Review Findings", review_path)
-        source_documents = cls._format_source_documents(
-            source_bundle, total_limit=REVISION_SOURCE_CHAR_LIMIT
-        )
-        return (
-            f"Case number: {case_number}\n\n"
-            "Revise the draft to resolve the review findings while staying "
-            "faithful to the sources.\n"
-            "Return the full corrected Markdown draft.\n\n"
-            f"{instructions_block}\n\n"
-            f"{template_block}\n\n"
-            f"{draft_block}\n\n"
-            f"{review_block}\n\n"
-            f"{source_documents}"
-        )
 
     @classmethod
     def _build_refinement_orchestrator_prompt(
