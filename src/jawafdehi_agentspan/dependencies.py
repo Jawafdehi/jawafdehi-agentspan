@@ -18,12 +18,15 @@ from jawafdehi_agentspan.assets import (
 from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
 from jawafdehi_agentspan.models import (
     CaseInitialization,
+    DocumentSource,
+    DocumentSourceType,
     PublishedCaseResult,
     PublishInput,
     SourceArtifact,
     SourceBundle,
 )
 from jawafdehi_agentspan.settings import get_settings
+from jawafdehi_agentspan.workspace import markdown_sources_dir, raw_sources_dir
 
 logger = logging.getLogger(__name__)
 
@@ -214,22 +217,30 @@ class WorkspaceSourceGatherer:
 
     def _base_bundle(self, initialization: CaseInitialization) -> SourceBundle:
         raw_case_details_path = (
-            initialization.workspace.sources_raw_dir / "special-court-case-details.txt"
+            raw_sources_dir(initialization.workspace.root_dir)
+            / "special-court-case-details.txt"
         )
         markdown_case_details_path = (
-            initialization.workspace.sources_markdown_dir
+            markdown_sources_dir(initialization.workspace.root_dir)
             / "special-court-case-details.md"
         )
         case_details = initialization.case_details_path.read_text(encoding="utf-8")
         raw_case_details_path.write_text(case_details, encoding="utf-8")
         markdown_case_details_path.write_text(case_details, encoding="utf-8")
+        document_source = DocumentSource(
+            name="Special Court case details",
+            type=DocumentSourceType.OTHER,
+            raw=raw_case_details_path,
+            markdown=markdown_case_details_path,
+        )
+        workspace = initialization.workspace.model_copy(
+            update={"sources": [document_source]}
+        )
         return SourceBundle(
             case_number=initialization.case_number,
-            workspace=initialization.workspace,
+            workspace=workspace,
             asset_root=initialization.asset_root,
             case_details_path=initialization.case_details_path,
-            raw_sources=[raw_case_details_path],
-            markdown_sources=[markdown_case_details_path],
             case_details_artifact=SourceArtifact(
                 source_type="case_details",
                 title="Special Court case details",
@@ -239,19 +250,33 @@ class WorkspaceSourceGatherer:
         )
 
     @staticmethod
+    def _artifact_to_document_source(artifact: SourceArtifact) -> DocumentSource:
+        source_type = DocumentSourceType.OTHER
+        if artifact.source_type == "press_release":
+            source_type = DocumentSourceType.CIAA_PRESS_RELEASE
+        elif artifact.source_type == "charge_sheet":
+            source_type = DocumentSourceType.CHARGE_SHEET
+        return DocumentSource(
+            name=artifact.title,
+            type=source_type,
+            raw=artifact.raw_path,
+            markdown=artifact.markdown_path,
+        )
+
+    @classmethod
     def _append_artifact(
-        bundle: SourceBundle, artifact: SourceArtifact
+        cls, bundle: SourceBundle, artifact: SourceArtifact
     ) -> SourceBundle:
-        raw_sources = list(bundle.raw_sources)
-        markdown_sources = list(bundle.markdown_sources)
-        if artifact.raw_path not in raw_sources:
-            raw_sources.append(artifact.raw_path)
-        if artifact.markdown_path not in markdown_sources:
-            markdown_sources.append(artifact.markdown_path)
-        updates: dict[str, Any] = {
-            "raw_sources": raw_sources,
-            "markdown_sources": markdown_sources,
-        }
+        sources = list(bundle.workspace.sources)
+        document_source = cls._artifact_to_document_source(artifact)
+        if all(
+            source.raw != document_source.raw
+            or source.markdown != document_source.markdown
+            for source in sources
+        ):
+            sources.append(document_source)
+        workspace = bundle.workspace.model_copy(update={"sources": sources})
+        updates: dict[str, Any] = {"workspace": workspace}
         if artifact.source_type == "press_release":
             updates["press_release_artifact"] = artifact
         if artifact.source_type == "charge_sheet":
@@ -327,11 +352,11 @@ class WorkspaceSourceGatherer:
             press_url = (press_row.get("source_url") or "").strip()
             if press_url:
                 raw_path = (
-                    initialization.workspace.sources_raw_dir
+                    raw_sources_dir(initialization.workspace.root_dir)
                     / f"ciaa-press-release-{press_id}.html"
                 )
                 markdown_path = (
-                    initialization.workspace.sources_markdown_dir
+                    markdown_sources_dir(initialization.workspace.root_dir)
                     / f"ciaa-press-release-{press_id}.md"
                 )
                 await self.fetcher.download(press_url, raw_path)
@@ -362,11 +387,11 @@ class WorkspaceSourceGatherer:
             )
         raw_path = await self.fetcher.download_with_detected_extension(
             pdf_url,
-            initialization.workspace.sources_raw_dir
+            raw_sources_dir(initialization.workspace.root_dir)
             / f"charge-sheet-{initialization.case_number}",
         )
         markdown_path = (
-            initialization.workspace.sources_markdown_dir
+            markdown_sources_dir(initialization.workspace.root_dir)
             / f"charge-sheet-{initialization.case_number}.md"
         )
         await self._convert_to_markdown(raw_path, markdown_path)
@@ -434,11 +459,11 @@ class SearchBackedNewsGatherer:
         bundle = source_bundle
         for index, result in enumerate(candidates, start=1):
             slug = self._slugify(result["title"])
-            raw_path = (
-                bundle.workspace.sources_raw_dir / f"news-{index:02d}-{slug}.html"
+            raw_path = raw_sources_dir(bundle.workspace.root_dir) / (
+                f"news-{index:02d}-{slug}.html"
             )
-            markdown_path = (
-                bundle.workspace.sources_markdown_dir / f"news-{index:02d}-{slug}.md"
+            markdown_path = markdown_sources_dir(bundle.workspace.root_dir) / (
+                f"news-{index:02d}-{slug}.md"
             )
             await self.fetcher.download(result["url"], raw_path)
             await self.adapter.convert_to_markdown(
@@ -454,11 +479,7 @@ class SearchBackedNewsGatherer:
                 identifier=f"{index:02d}-{slug}",
             )
             bundle = bundle.model_copy(
-                update={
-                    "raw_sources": [*bundle.raw_sources, raw_path],
-                    "markdown_sources": [*bundle.markdown_sources, markdown_path],
-                    "news_artifacts": [*bundle.news_artifacts, artifact],
-                }
+                update={"news_artifacts": [*bundle.news_artifacts, artifact]}
             )
         return bundle
 
@@ -531,18 +552,15 @@ class MCPPublishFinalizer:
         self, publish_input: PublishInput
     ) -> list[dict[str, str]]:
         uploaded: list[dict[str, str]] = []
-        for raw_source in publish_input.source_bundle.raw_sources:
-            title = raw_source.stem.replace("-", " ").title()
+        for source in publish_input.source_bundle.workspace.sources:
             source_type = "OFFICIAL_GOVERNMENT"
-            if "charge-sheet" in raw_source.name:
+            if source.type == DocumentSourceType.CHARGE_SHEET:
                 source_type = "LEGAL_PROCEDURAL"
-            elif "court-order" in raw_source.name:
-                source_type = "LEGAL_COURT_ORDER"
             payload = await self.adapter.upload_document_source(
                 {
-                    "title": title,
+                    "title": source.name,
                     "description": f"{publish_input.case_number} source document",
-                    "file_path": str(raw_source),
+                    "file_path": str(source.raw),
                     "source_type": source_type,
                 }
             )

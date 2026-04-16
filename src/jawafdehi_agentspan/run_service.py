@@ -24,7 +24,7 @@ from jawafdehi_agentspan.models import (
 )
 from jawafdehi_agentspan.runtime import AgentExecutor, AgentSpanExecutor
 from jawafdehi_agentspan.settings import Settings, get_settings
-from jawafdehi_agentspan.workspace import create_workspace
+from jawafdehi_agentspan.workspace import build_case_initialization, create_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -165,30 +165,11 @@ class RunService:
         case_number: str,
         workspace_root: Path,
     ) -> CaseInitialization:
-        workspace = {
-            "root_dir": workspace_root,
-            "logs_dir": workspace_root / "logs",
-            "data_dir": workspace_root / "data",
-            "sources_raw_dir": workspace_root / "sources" / "raw",
-            "sources_markdown_dir": workspace_root / "sources" / "markdown",
-            "memory_file": workspace_root / "MEMORY.md",
-        }
-        case_details_path = workspace_root / f"case_details-{case_number}.md"
-        content = _run_async(
-            self.dependencies.ngm_client.fetch_case_details(
-                case_number, case_details_path
-            )
-        )
-        summary_path = workspace_root / "logs" / "case-summary.md"
-        summary_path.write_text(
-            f"# Case Summary\n\n- Case number: {case_number}\n\n{content[:1200]}\n",
-            encoding="utf-8",
-        )
-        return CaseInitialization(
-            case_number=case_number,
-            workspace=workspace,
+        return build_case_initialization(
+            case_number,
+            workspace_root,
+            self.dependencies.ngm_client.fetch_case_details,
             asset_root=ciaa_workflow_root(),
-            case_details_path=case_details_path,
         )
 
     def _gather_sources(self, initialization: CaseInitialization) -> SourceBundle:
@@ -247,13 +228,27 @@ class RunService:
     ) -> str:
         blocks: list[str] = []
         remaining = total_limit
-        for path in source_bundle.markdown_sources:
+        for source in source_bundle.workspace.sources:
             if remaining <= 0:
                 break
+            path = source.markdown
             source_limit = min(cls._select_source_char_limit(path), remaining)
             blocks.append(
                 cls._format_document_block(
-                    path.name,
+                    source.name,
+                    path,
+                    max_chars=source_limit,
+                )
+            )
+            remaining -= source_limit
+        for artifact in source_bundle.news_artifacts:
+            if remaining <= 0:
+                break
+            path = artifact.markdown_path
+            source_limit = min(cls._select_source_char_limit(path), remaining)
+            blocks.append(
+                cls._format_document_block(
+                    artifact.title,
                     path,
                     max_chars=source_limit,
                 )

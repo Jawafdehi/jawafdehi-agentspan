@@ -13,6 +13,7 @@ from jawafdehi_agentspan.dependencies import (
     get_dependencies,
 )
 from jawafdehi_agentspan.models import CaseInitialization, PublishInput, SourceBundle
+from jawafdehi_agentspan.workspace import build_case_initialization
 
 
 def _run_async(awaitable):
@@ -117,29 +118,11 @@ def convert_to_markdown(file_path: str, output_path: str, workspace_root: str) -
 
 @tool(isolated=False)
 def initialize_casework_step(case_number: str, workspace_root: str) -> dict[str, Any]:
-    root = _workspace_root(workspace_root)
-    workspace = {
-        "root_dir": root,
-        "logs_dir": root / "logs",
-        "data_dir": root / "data",
-        "sources_raw_dir": root / "sources" / "raw",
-        "sources_markdown_dir": root / "sources" / "markdown",
-        "memory_file": root / "MEMORY.md",
-    }
-    case_details_path = root / f"case_details-{case_number}.md"
-    content = _run_async(
-        get_dependencies().ngm_client.fetch_case_details(case_number, case_details_path)
-    )
-    summary_path = root / "logs" / "case-summary.md"
-    summary_path.write_text(
-        f"# Case Summary\n\n- Case number: {case_number}\n\n{content[:1200]}\n",
-        encoding="utf-8",
-    )
-    initialization = CaseInitialization(
-        case_number=case_number,
-        workspace=workspace,
+    initialization = build_case_initialization(
+        case_number,
+        _workspace_root(workspace_root),
+        get_dependencies().ngm_client.fetch_case_details,
         asset_root=ciaa_workflow_root(),
-        case_details_path=case_details_path,
     )
     return json.loads(initialization.model_dump_json())
 
