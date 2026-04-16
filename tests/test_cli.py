@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from jawaf_span.cli import app
-from jawaf_span.models import ReviewOutcome, WorkflowResult
+from jawafdehi_agentspan.cli import app
+from jawafdehi_agentspan.models import ReviewOutcome, WorkflowResult
 
 
 def test_cli_run_publishes_case(monkeypatch):
@@ -20,7 +20,7 @@ def test_cli_run_publishes_case(monkeypatch):
                 final_outcome=ReviewOutcome.approved,
             )
 
-    monkeypatch.setattr("jawaf_span.cli.RunService", lambda: FakeRunService())
+    monkeypatch.setattr("jawafdehi_agentspan.cli.RunService", lambda: FakeRunService())
     result = runner.invoke(app, ["run", "081-CR-0046"])
 
     assert result.exit_code == 0

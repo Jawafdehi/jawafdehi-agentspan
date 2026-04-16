@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
-from jawaf_span.assets import ciaa_workflow_root
-from jawaf_span.models import (
+from jawafdehi_agentspan.assets import ciaa_workflow_root
+from jawafdehi_agentspan.models import (
     CaseInitialization,
     Critique,
     OrchestratedRefinementOutput,
@@ -17,8 +16,8 @@ from jawaf_span.models import (
     WorkflowResult,
     WorkspaceContext,
 )
-from jawaf_span.run_service import RunService
-from jawaf_span.settings import Settings
+from jawafdehi_agentspan.run_service import RunService
+from jawafdehi_agentspan.settings import Settings
 
 
 def _workspace(tmp_path: Path) -> WorkspaceContext:
@@ -130,7 +129,9 @@ class FakeExecutor:
                     "## Short Description\nछोटो विवरण\n\n"
                     "## Key Allegations\n- आरोप १\n- आरोप २\n\n"
                     "## Timeline\n- 2082-01-01: दर्ता\n\n"
-                    "## Description\n" + ("विस्तृत विवरण।" * 60) + "\n\n## Missing Details\nथप पुष्टिकरण आवश्यक।\n"
+                    "## Description\n"
+                    + ("विस्तृत विवरण।" * 60)
+                    + "\n\n## Missing Details\nथप पुष्टिकरण आवश्यक।\n"
                 ),
                 review_markdown="## Overall Review\n\nInitial review result\n",
                 critique=final,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from jawaf_span.tools import (
+from jawafdehi_agentspan.tools import (
     append_workspace_file,
     list_workspace_files,
     read_reference_file,
@@ -26,7 +26,7 @@ def test_workspace_file_tools_roundtrip(tmp_path: Path):
 def test_read_reference_file_can_read_assets(tmp_path: Path):
     root = tmp_path / "workspace"
     root.mkdir()
-    from jawaf_span.assets import ciaa_case_template_path
+    from jawafdehi_agentspan.assets import ciaa_case_template_path
 
     content = read_reference_file(str(ciaa_case_template_path()), str(root))
     assert "# Case Draft Template" in content

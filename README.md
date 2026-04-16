@@ -7,7 +7,7 @@ AgentSpan-based CIAA caseworker service for Jawafdehi.
 Install dependencies:
 
 ```bash
-cd services/jawaf-span
+cd services/jawafdehi-agentspan
 poetry install
 ```
 

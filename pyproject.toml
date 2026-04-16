@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "jawaf-span"
+name = "jawafdehi-agentspan"
 version = "0.1.0"
 description = "AgentSpan-based CIAA caseworker service for Jawafdehi workflows"
 authors = ["Jawafdehi Inquiry <inquiry@jawafdehi.org>"]
 readme = "README.md"
-packages = [{include = "jawaf_span", from = "src"}]
+packages = [{include = "jawafdehi_agentspan", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -24,7 +24,7 @@ black = "^26.3.0"
 ruff = "^0.15.5"
 
 [tool.poetry.scripts]
-jawaf = "jawaf_span.cli:main"
+jawaf = "jawafdehi_agentspan.cli:main"
 
 [tool.pytest.ini_options]
 python_files = ["tests.py", "test_*.py", "*_tests.py"]

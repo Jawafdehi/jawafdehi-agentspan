@@ -8,7 +8,7 @@ from typing import Any, Protocol, TypeVar
 from agentspan.agents import Agent, AgentRuntime
 from pydantic import BaseModel
 
-from jawaf_span.settings import Settings
+from jawafdehi_agentspan.settings import Settings
 
 T = TypeVar("T")
 

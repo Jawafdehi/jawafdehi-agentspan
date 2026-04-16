@@ -5,7 +5,7 @@ import json
 import pytest
 from mcp.types import TextContent
 
-from jawaf_span.mcp_adapters import MCPToolAdapter
+from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
 
 
 class FakeTool:

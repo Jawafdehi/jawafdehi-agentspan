@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from jawaf_span.models import WorkspaceContext
+from jawafdehi_agentspan.models import WorkspaceContext
 
 
 def create_workspace(case_number: str) -> WorkspaceContext:

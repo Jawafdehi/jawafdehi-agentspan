@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from jawaf_span.runtime import AgentSpanExecutor
+from jawafdehi_agentspan.runtime import AgentSpanExecutor
 
 
 def test_unwrap_output_returns_inner_result_for_agentspan_wrapper():

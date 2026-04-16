@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from jawaf_span.dependencies import SearchBackedNewsGatherer
-from jawaf_span.models import SourceArtifact, SourceBundle, WorkspaceContext
-from jawaf_span.settings import Settings
+from jawafdehi_agentspan.dependencies import SearchBackedNewsGatherer
+from jawafdehi_agentspan.models import SourceArtifact, SourceBundle, WorkspaceContext
+from jawafdehi_agentspan.settings import Settings
 
 
 class UnusedAdapter:
@@ -48,7 +48,7 @@ def _workspace(tmp_path: Path) -> WorkspaceContext:
 
 async def test_news_gatherer_skips_when_brave_key_missing(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
-        "jawaf_span.dependencies.get_settings",
+        "jawafdehi_agentspan.dependencies.get_settings",
         lambda: Settings(
             JAWAFDEHI_API_TOKEN="test-token",
             OPENAI_API_KEY="test-openai-key",

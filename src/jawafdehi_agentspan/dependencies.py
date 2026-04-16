@@ -10,20 +10,20 @@ from typing import Any, Protocol
 
 import httpx
 
-from jawaf_span.assets import (
+from jawafdehi_agentspan.assets import (
     ciaa_ag_index_path,
     ciaa_press_releases_path,
     ciaa_workflow_root,
 )
-from jawaf_span.mcp_adapters import MCPToolAdapter
-from jawaf_span.models import (
+from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
+from jawafdehi_agentspan.models import (
     CaseInitialization,
     PublishedCaseResult,
     PublishInput,
     SourceArtifact,
     SourceBundle,
 )
-from jawaf_span.settings import get_settings
+from jawafdehi_agentspan.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -405,7 +405,8 @@ class SearchBackedNewsGatherer:
     async def gather_news(self, source_bundle: SourceBundle) -> SourceBundle:
         if not get_settings().brave_search_api_key:
             logger.warning(
-                "BRAVE_SEARCH_API_KEY is not configured; skipping news gathering for %s",
+                "BRAVE_SEARCH_API_KEY is not configured; "
+                "skipping news gathering for %s",
                 source_bundle.case_number,
             )
             return source_bundle
@@ -628,7 +629,7 @@ class MCPPublishFinalizer:
                         "value": {
                             "entity": entity_id,
                             "relationship_type": "accused",
-                            "notes": "Auto-linked by jawaf-span",
+                            "notes": "Auto-linked by jawafdehi-agentspan",
                         },
                     }
                 )
@@ -774,8 +775,8 @@ def ensure_within_workspace_or_assets(path: Path) -> None:
     try:
         resolved_path.relative_to(ciaa_workflow_root().resolve())
         return
-    except ValueError:
-        raise RuntimeError(f"Path is outside the allowed asset root: {path}")
+    except ValueError as err:
+        raise RuntimeError(f"Path is outside the allowed asset root: {path}") from err
 
 
 def render_review_markdown(critique: Any) -> str:

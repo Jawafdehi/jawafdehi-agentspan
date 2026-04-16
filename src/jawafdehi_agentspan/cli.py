@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import typer
 
-from jawaf_span.run_service import RunService
-from jawaf_span.settings import get_settings
+from jawafdehi_agentspan.run_service import RunService
+from jawafdehi_agentspan.settings import get_settings
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 

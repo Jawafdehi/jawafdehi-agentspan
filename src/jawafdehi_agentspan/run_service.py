@@ -4,14 +4,14 @@ import asyncio
 import logging
 from pathlib import Path
 
-from jawaf_span.agents import build_refinement_orchestrator
-from jawaf_span.assets import ciaa_workflow_root
-from jawaf_span.dependencies import (
+from jawafdehi_agentspan.agents import build_refinement_orchestrator
+from jawafdehi_agentspan.assets import ciaa_workflow_root
+from jawafdehi_agentspan.dependencies import (
     build_default_dependencies,
     use_dependencies,
 )
-from jawaf_span.logging_utils import configure_run_logging
-from jawaf_span.models import (
+from jawafdehi_agentspan.logging_utils import configure_run_logging
+from jawafdehi_agentspan.models import (
     ACCEPTED_REVIEW_OUTCOMES,
     CaseInitialization,
     CIAACaseInput,
@@ -22,9 +22,9 @@ from jawaf_span.models import (
     SourceBundle,
     WorkflowResult,
 )
-from jawaf_span.runtime import AgentExecutor, AgentSpanExecutor
-from jawaf_span.settings import Settings, get_settings
-from jawaf_span.workspace import create_workspace
+from jawafdehi_agentspan.runtime import AgentExecutor, AgentSpanExecutor
+from jawafdehi_agentspan.settings import Settings, get_settings
+from jawafdehi_agentspan.workspace import create_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +103,12 @@ class RunService:
             ),
             output_type=OrchestratedRefinementOutput,
         )
-        draft_path.write_text(orchestrated.draft_markdown.strip() + "\n", encoding="utf-8")
-        review_path.write_text(orchestrated.review_markdown.strip() + "\n", encoding="utf-8")
+        draft_path.write_text(
+            orchestrated.draft_markdown.strip() + "\n", encoding="utf-8"
+        )
+        review_path.write_text(
+            orchestrated.review_markdown.strip() + "\n", encoding="utf-8"
+        )
         _validate_required_output(draft_path)
         _validate_required_output(review_path)
 
@@ -270,15 +274,23 @@ class RunService:
             initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
         )
         template_path = initialization.asset_root / "instructions" / "case-template.md"
+        instructions_block = cls._format_document_block(
+            "Workflow Instructions", instructions_path
+        )
+        template_block = cls._format_document_block("Case Template", template_path)
+        source_documents = cls._format_source_documents(
+            source_bundle, total_limit=DRAFT_SOURCE_CHAR_LIMIT
+        )
         return (
             f"Case number: {case_number}\n"
             f"Destination draft path: {draft_path}\n\n"
             "Prepare a complete Nepali Jawafdehi case draft.\n"
-            "Follow the workflow instructions and template closely, reconcile the source documents, "
-            "and produce a publishable draft in Markdown.\n\n"
-            f"{cls._format_document_block('Workflow Instructions', instructions_path)}\n\n"
-            f"{cls._format_document_block('Case Template', template_path)}\n\n"
-            f"{cls._format_source_documents(source_bundle, total_limit=DRAFT_SOURCE_CHAR_LIMIT)}"
+            "Follow the workflow instructions and template closely, "
+            "reconcile the source documents, and produce a publishable "
+            "draft in Markdown.\n\n"
+            f"{instructions_block}\n\n"
+            f"{template_block}\n\n"
+            f"{source_documents}"
         )
 
     @classmethod
@@ -294,14 +306,23 @@ class RunService:
             initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
         )
         template_path = initialization.asset_root / "instructions" / "case-template.md"
+        instructions_block = cls._format_document_block(
+            "Workflow Instructions", instructions_path
+        )
+        template_block = cls._format_document_block("Case Template", template_path)
+        draft_block = cls._format_document_block("Current Draft", draft_path)
+        source_documents = cls._format_source_documents(
+            source_bundle, total_limit=REVIEW_SOURCE_CHAR_LIMIT
+        )
         return (
             f"Case number: {case_number}\n\n"
-            "Review this draft for factual grounding, completeness, and publishability.\n"
+            "Review this draft for factual grounding, completeness, and "
+            "publishability.\n"
             "Be strict about unsupported claims and missing key facts.\n\n"
-            f"{cls._format_document_block('Workflow Instructions', instructions_path)}\n\n"
-            f"{cls._format_document_block('Case Template', template_path)}\n\n"
-            f"{cls._format_document_block('Current Draft', draft_path)}\n\n"
-            f"{cls._format_source_documents(source_bundle, total_limit=REVIEW_SOURCE_CHAR_LIMIT)}"
+            f"{instructions_block}\n\n"
+            f"{template_block}\n\n"
+            f"{draft_block}\n\n"
+            f"{source_documents}"
         )
 
     @classmethod
@@ -318,15 +339,25 @@ class RunService:
             initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
         )
         template_path = initialization.asset_root / "instructions" / "case-template.md"
+        instructions_block = cls._format_document_block(
+            "Workflow Instructions", instructions_path
+        )
+        template_block = cls._format_document_block("Case Template", template_path)
+        draft_block = cls._format_document_block("Current Draft", draft_path)
+        review_block = cls._format_document_block("Review Findings", review_path)
+        source_documents = cls._format_source_documents(
+            source_bundle, total_limit=REVISION_SOURCE_CHAR_LIMIT
+        )
         return (
             f"Case number: {case_number}\n\n"
-            "Revise the draft to resolve the review findings while staying faithful to the sources.\n"
+            "Revise the draft to resolve the review findings while staying "
+            "faithful to the sources.\n"
             "Return the full corrected Markdown draft.\n\n"
-            f"{cls._format_document_block('Workflow Instructions', instructions_path)}\n\n"
-            f"{cls._format_document_block('Case Template', template_path)}\n\n"
-            f"{cls._format_document_block('Current Draft', draft_path)}\n\n"
-            f"{cls._format_document_block('Review Findings', review_path)}\n\n"
-            f"{cls._format_source_documents(source_bundle, total_limit=REVISION_SOURCE_CHAR_LIMIT)}"
+            f"{instructions_block}\n\n"
+            f"{template_block}\n\n"
+            f"{draft_block}\n\n"
+            f"{review_block}\n\n"
+            f"{source_documents}"
         )
 
     @classmethod
@@ -343,16 +374,34 @@ class RunService:
             initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
         )
         template_path = initialization.asset_root / "instructions" / "case-template.md"
+        instructions_block = cls._format_document_block(
+            "Workflow Instructions",
+            instructions_path,
+            max_chars=ORCHESTRATOR_INSTRUCTIONS_CHAR_LIMIT,
+        )
+        template_block = cls._format_document_block(
+            "Case Template",
+            template_path,
+            max_chars=ORCHESTRATOR_TEMPLATE_CHAR_LIMIT,
+        )
+        source_documents = cls._format_source_documents(
+            source_bundle, total_limit=ORCHESTRATOR_SOURCE_CHAR_LIMIT
+        )
         return (
             f"Case number: {case_number}\n"
             f"Destination draft path: {draft_path}\n"
             f"Destination review path: {review_path}\n\n"
-            "Run the complete drafting-and-refinement workflow in one orchestrated pass.\n"
-            "Case initialization, source gathering, and news gathering are already complete before this prompt.\n"
-            "Start from the provided source documents only, then draft, review, extract critique, and optionally revise once before re-reviewing.\n"
-            "Prefer primary source facts, avoid unsupported claims, and keep the final draft publishable in Nepali markdown.\n"
+            "Run the complete drafting-and-refinement workflow in one "
+            "orchestrated pass.\n"
+            "Case initialization, source gathering, and news gathering are "
+            "already complete before this prompt.\n"
+            "Start from the provided source documents only, then draft, "
+            "review, extract critique, and optionally revise once before "
+            "re-reviewing.\n"
+            "Prefer primary source facts, avoid unsupported claims, and keep "
+            "the final draft publishable in Nepali markdown.\n"
             "Return the final structured orchestrated refinement output only.\n\n"
-            f"{cls._format_document_block('Workflow Instructions', instructions_path, max_chars=ORCHESTRATOR_INSTRUCTIONS_CHAR_LIMIT)}\n\n"
-            f"{cls._format_document_block('Case Template', template_path, max_chars=ORCHESTRATOR_TEMPLATE_CHAR_LIMIT)}\n\n"
-            f"{cls._format_source_documents(source_bundle, total_limit=ORCHESTRATOR_SOURCE_CHAR_LIMIT)}"
+            f"{instructions_block}\n\n"
+            f"{template_block}\n\n"
+            f"{source_documents}"
         )

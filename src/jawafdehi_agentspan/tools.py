@@ -7,12 +7,12 @@ from typing import Any
 
 from agentspan.agents import tool
 
-from jawaf_span.assets import ciaa_workflow_root
-from jawaf_span.dependencies import (
+from jawafdehi_agentspan.assets import ciaa_workflow_root
+from jawafdehi_agentspan.dependencies import (
     ensure_within_workspace,
     get_dependencies,
 )
-from jawaf_span.models import CaseInitialization, PublishInput, SourceBundle
+from jawafdehi_agentspan.models import CaseInitialization, PublishInput, SourceBundle
 
 
 def _run_async(awaitable):
