@@ -144,69 +144,6 @@ def gather_news_step(source_bundle_json: str) -> dict[str, Any]:
 
 
 @tool(isolated=False)
-def create_jawafdehi_case(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.create_jawafdehi_case(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def patch_jawafdehi_case(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.patch_jawafdehi_case(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def upload_document_source(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.upload_document_source(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def search_jawaf_entities(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.search_jawaf_entities(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def get_jawaf_entity(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.get_jawaf_entity(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def create_jawaf_entity(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.create_jawaf_entity(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def get_jawafdehi_case(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.get_jawafdehi_case(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def search_jawafdehi_cases(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.search_jawafdehi_cases(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
-def convert_date(arguments_json: str) -> dict[str, Any]:
-    return _run_async(
-        get_dependencies().adapter.convert_date(json.loads(arguments_json))
-    )
-
-
-@tool(isolated=False)
 def publish_case_step(publish_input_json: str) -> dict[str, Any]:
     publish_input = PublishInput.model_validate_json(publish_input_json)
     result = _run_async(

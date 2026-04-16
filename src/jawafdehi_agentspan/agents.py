@@ -12,23 +12,12 @@ from jawafdehi_agentspan.models import (
 from jawafdehi_agentspan.settings import Settings
 from jawafdehi_agentspan.tools import (
     brave_search,
-    convert_date,
     convert_to_markdown,
-    create_jawaf_entity,
-    create_jawafdehi_case,
-    download_file,
     fetch_url,
     gather_news_step,
     gather_sources_step,
-    get_jawaf_entity,
-    get_jawafdehi_case,
     initialize_casework_step,
-    ngm_extract_case_data,
-    patch_jawafdehi_case,
     publish_case_step,
-    search_jawaf_entities,
-    search_jawafdehi_cases,
-    upload_document_source,
 )
 
 
@@ -172,20 +161,7 @@ def build_publish_agent(settings: Settings) -> Agent:
             "publish payload from the prompt, then return the structured "
             "publication result."
         ),
-        tools=[
-            publish_case_step,
-            create_jawafdehi_case,
-            patch_jawafdehi_case,
-            upload_document_source,
-            search_jawaf_entities,
-            get_jawaf_entity,
-            create_jawaf_entity,
-            get_jawafdehi_case,
-            search_jawafdehi_cases,
-            convert_date,
-            download_file,
-            ngm_extract_case_data,
-        ],
+        tools=[publish_case_step],
         required_tools=["publish_case_step"],
         output_type=PublishedCaseResult,
         max_turns=8,

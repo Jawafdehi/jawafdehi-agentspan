@@ -3,36 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from jawafdehi_mcp.tools.date_converter import DateConverterTool
-from jawafdehi_mcp.tools.document_converter import DocumentConverterTool
-from jawafdehi_mcp.tools.jawafdehi_cases import (
-    CreateJawafdehiCaseTool,
-    CreateJawafEntityTool,
-    GetJawafdehiCaseTool,
-    GetJawafEntityTool,
-    PatchJawafdehiCaseTool,
-    SearchJawafdehiCasesTool,
-    SearchJawafEntitiesTool,
-    UploadDocumentSourceTool,
-)
-from jawafdehi_mcp.tools.ngm_extract import NGMExtractCaseDataTool
+from jawafdehi_mcp.server import TOOL_MAP
 from mcp.types import TextContent
 
 
 class MCPToolAdapter:
-    def __init__(self) -> None:
-        self.ngm_extract_case_data_tool = NGMExtractCaseDataTool()
-        self.convert_to_markdown_tool = DocumentConverterTool()
-        self.create_jawafdehi_case_tool = CreateJawafdehiCaseTool()
-        self.patch_jawafdehi_case_tool = PatchJawafdehiCaseTool()
-        self.upload_document_source_tool = UploadDocumentSourceTool()
-        self.search_jawaf_entities_tool = SearchJawafEntitiesTool()
-        self.get_jawaf_entity_tool = GetJawafEntityTool()
-        self.create_jawaf_entity_tool = CreateJawafEntityTool()
-        self.get_jawafdehi_case_tool = GetJawafdehiCaseTool()
-        self.search_jawafdehi_cases_tool = SearchJawafdehiCasesTool()
-        self.convert_date_tool = DateConverterTool()
-
     @staticmethod
     def _text_content(items: list[TextContent]) -> str:
         return "\n".join(
@@ -54,10 +29,22 @@ class MCPToolAdapter:
             raise RuntimeError(str(payload["error"]))
         return payload
 
+    async def call_text(self, tool_name: str, arguments: dict[str, Any]) -> str:
+        tool = TOOL_MAP.get(tool_name)
+        if tool is None:
+            raise RuntimeError(f"Unknown MCP tool: {tool_name}")
+        return self._text_content(await tool.execute(arguments))
+
+    async def call_json(
+        self, tool_name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
+        tool = TOOL_MAP.get(tool_name)
+        if tool is None:
+            raise RuntimeError(f"Unknown MCP tool: {tool_name}")
+        return self._json_payload(await tool.execute(arguments))
+
     async def ngm_extract_case_data(self, arguments: dict[str, Any]) -> str:
-        result = self._text_content(
-            await self.ngm_extract_case_data_tool.execute(arguments)
-        )
+        result = await self.call_text("ngm_extract_case_data", arguments)
         try:
             payload = json.loads(result)
             if isinstance(payload, dict) and not payload.get("success", True):
@@ -67,48 +54,34 @@ class MCPToolAdapter:
         return result
 
     async def convert_to_markdown(self, arguments: dict[str, Any]) -> str:
-        text = self._text_content(
-            await self.convert_to_markdown_tool.execute(arguments)
-        )
+        text = await self.call_text("convert_to_markdown", arguments)
         if text.startswith("Error:"):
             raise RuntimeError(text)
         return text
 
     async def create_jawafdehi_case(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(
-            await self.create_jawafdehi_case_tool.execute(arguments)
-        )
+        return await self.call_json("create_jawafdehi_case", arguments)
 
     async def patch_jawafdehi_case(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(
-            await self.patch_jawafdehi_case_tool.execute(arguments)
-        )
+        return await self.call_json("patch_jawafdehi_case", arguments)
 
     async def upload_document_source(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(
-            await self.upload_document_source_tool.execute(arguments)
-        )
+        return await self.call_json("upload_document_source", arguments)
 
     async def search_jawaf_entities(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(
-            await self.search_jawaf_entities_tool.execute(arguments)
-        )
+        return await self.call_json("search_jawaf_entities", arguments)
 
     async def get_jawaf_entity(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(await self.get_jawaf_entity_tool.execute(arguments))
+        return await self.call_json("get_jawaf_entity", arguments)
 
     async def create_jawaf_entity(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(
-            await self.create_jawaf_entity_tool.execute(arguments)
-        )
+        return await self.call_json("create_jawaf_entity", arguments)
 
     async def get_jawafdehi_case(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(await self.get_jawafdehi_case_tool.execute(arguments))
+        return await self.call_json("get_jawafdehi_case", arguments)
 
     async def search_jawafdehi_cases(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(
-            await self.search_jawafdehi_cases_tool.execute(arguments)
-        )
+        return await self.call_json("search_jawafdehi_cases", arguments)
 
     async def convert_date(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        return self._json_payload(await self.convert_date_tool.execute(arguments))
+        return await self.call_json("convert_date", arguments)
