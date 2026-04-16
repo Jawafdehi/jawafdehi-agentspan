@@ -5,6 +5,7 @@ from agentspan.agents import Agent
 from jawaf_span.models import (
     CaseInitialization,
     Critique,
+    OrchestratedRefinementOutput,
     PublishedCaseResult,
     SourceBundle,
 )
@@ -159,4 +160,32 @@ def build_publish_agent(settings: Settings) -> Agent:
         required_tools=["publish_case_step"],
         output_type=PublishedCaseResult,
         max_turns=8,
+    )
+
+
+
+def build_refinement_orchestrator(settings: Settings) -> Agent:
+    return Agent(
+        name="ciaa_refinement_orchestrator",
+        model=settings.llm_model,
+        instructions=(
+            "You orchestrate a single CIAA draft-refinement workflow across specialist sub-agents. "
+            "Initialization, source gathering, and news gathering are already complete in Python before this agent starts. "
+            "Do not call initialize, source gathering, or news gathering specialists. "
+            "Begin from the provided case context and source documents, then use only the drafting, review, critique extraction, and optional single revision specialists. "
+            "If the extracted critique says blocked, stop and return the final blocked result. "
+            "If the extracted critique says approved or approved_with_minor_edits and the score is at least 8, stop and return the final result. "
+            "Otherwise, you may use the reviser exactly once, then run reviewer and critique extractor one more time. "
+            "Never revise more than once. Never publish. "
+            "Return only the final structured OrchestratedRefinementOutput with the final draft, final review, final critique, whether revision was used, and the initial critique when a revision happened."
+        ),
+        agents=[
+            build_draft_agent(settings),
+            build_review_agent(settings),
+            build_critique_extractor(settings),
+            build_revise_agent(settings),
+        ],
+        strategy="handoff",
+        output_type=OrchestratedRefinementOutput,
+        max_turns=18,
     )

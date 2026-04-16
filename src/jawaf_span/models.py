@@ -104,6 +104,14 @@ class RefinementIteration(BaseModel):
     revised: bool
 
 
+class OrchestratedRefinementOutput(BaseModel):
+    draft_markdown: str
+    review_markdown: str
+    critique: Critique
+    revision_used: bool = False
+    initial_critique: Critique | None = None
+
+
 class RefinementResult(BaseModel):
     workspace: WorkspaceContext
     draft_path: Path

@@ -9,6 +9,7 @@ from jawaf_span.assets import ciaa_workflow_root
 from jawaf_span.models import (
     CaseInitialization,
     Critique,
+    OrchestratedRefinementOutput,
     PublishedCaseResult,
     ReviewOutcome,
     SourceArtifact,
@@ -101,41 +102,40 @@ class FakeExecutor:
         return None
 
     def run(self, agent, prompt: str, output_type=None):
-        if agent.name == "ciaa_initialize":
-            return json.loads(self.initialization.model_dump_json())
-        if agent.name == "ciaa_source_gatherer":
-            return json.loads(self.source_bundle.model_dump_json())
-        if agent.name == "ciaa_news_gatherer":
-            return json.loads(self.source_bundle.model_dump_json())
-        if agent.name == "ciaa_drafter":
-            draft_path = self.initialization.workspace.root_dir / "draft.md"
-            draft_path.write_text(
-                "# Jawafdehi Case Draft\n\n"
-                "## Title\nनमुना मुद्दा\n\n"
-                "## Short Description\nछोटो विवरण\n\n"
-                "## Key Allegations\n- आरोप १\n- आरोप २\n\n"
-                "## Timeline\n- 2082-01-01: दर्ता\n\n"
-                "## Description\n"
-                + ("विस्तृत विवरण।" * 60)
-                + "\n\n## Missing Details\nथप पुष्टिकरण आवश्यक।\n",
-                encoding="utf-8",
-            )
-            return "ok"
-        if agent.name == "ciaa_reviewer":
-            critique = self.critiques[self.review_calls]
-            return critique.model_dump_json()
-        if agent.name == "ciaa_critique_extractor":
-            critique = self.critiques[self.review_calls]
-            self.review_calls += 1
-            return critique
-        if agent.name == "ciaa_reviser":
-            return (
-                "# Jawafdehi Case Draft\n\n"
-                "## Title\nनमुना मुद्दा\n\n"
-                "## Short Description\nछोटो विवरण\n\n"
-                "## Key Allegations\n- आरोप १\n- आरोप २\n\n"
-                "## Timeline\n- 2082-01-01: दर्ता\n\n"
-                "## Description\n" + ("सुधार गरिएको विस्तृत विवरण।" * 60) + "\n"
+        if agent.name == "ciaa_refinement_orchestrator":
+            if len(self.critiques) > 1:
+                initial = self.critiques[0]
+                final = self.critiques[1]
+                self.review_calls = 2
+                return OrchestratedRefinementOutput(
+                    draft_markdown=(
+                        "# Jawafdehi Case Draft\n\n"
+                        "## Title\nनमुना मुद्दा\n\n"
+                        "## Short Description\nछोटो विवरण\n\n"
+                        "## Key Allegations\n- आरोप १\n- आरोप २\n\n"
+                        "## Timeline\n- 2082-01-01: दर्ता\n\n"
+                        "## Description\n" + ("सुधार गरिएको विस्तृत विवरण।" * 60) + "\n"
+                    ),
+                    review_markdown="## Overall Review\n\nRe-review result\n",
+                    critique=final,
+                    revision_used=True,
+                    initial_critique=initial,
+                )
+            final = self.critiques[0]
+            self.review_calls = 1
+            return OrchestratedRefinementOutput(
+                draft_markdown=(
+                    "# Jawafdehi Case Draft\n\n"
+                    "## Title\nनमुना मुद्दा\n\n"
+                    "## Short Description\nछोटो विवरण\n\n"
+                    "## Key Allegations\n- आरोप १\n- आरोप २\n\n"
+                    "## Timeline\n- 2082-01-01: दर्ता\n\n"
+                    "## Description\n" + ("विस्तृत विवरण।" * 60) + "\n\n## Missing Details\nथप पुष्टिकरण आवश्यक।\n"
+                ),
+                review_markdown="## Overall Review\n\nInitial review result\n",
+                critique=final,
+                revision_used=False,
+                initial_critique=None,
             )
         raise AssertionError(f"Unexpected agent {agent.name}")
 

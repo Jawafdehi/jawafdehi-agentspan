@@ -4,12 +4,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from jawaf_span.agents import (
-    build_critique_extractor,
-    build_draft_agent,
-    build_review_agent,
-    build_revise_agent,
-)
+from jawaf_span.agents import build_refinement_orchestrator
 from jawaf_span.assets import ciaa_workflow_root
 from jawaf_span.dependencies import (
     build_default_dependencies,
@@ -20,7 +15,7 @@ from jawaf_span.models import (
     ACCEPTED_REVIEW_OUTCOMES,
     CaseInitialization,
     CIAACaseInput,
-    Critique,
+    OrchestratedRefinementOutput,
     PublishInput,
     RefinementIteration,
     RefinementResult,
@@ -36,6 +31,9 @@ logger = logging.getLogger(__name__)
 DRAFT_SOURCE_CHAR_LIMIT = 120000
 REVIEW_SOURCE_CHAR_LIMIT = 140000
 REVISION_SOURCE_CHAR_LIMIT = 140000
+ORCHESTRATOR_SOURCE_CHAR_LIMIT = 50000
+ORCHESTRATOR_INSTRUCTIONS_CHAR_LIMIT = 4000
+ORCHESTRATOR_TEMPLATE_CHAR_LIMIT = 12000
 CHARGE_SHEET_CHAR_LIMIT = 70000
 STANDARD_SOURCE_CHAR_LIMIT = 20000
 
@@ -93,90 +91,46 @@ class RunService:
         source_bundle = self._gather_news(source_bundle)
 
         draft_path = workspace_root / "draft.md"
-        draft_text = executor.run(
-            build_draft_agent(self.settings),
-            self._build_draft_prompt(
+        review_path = workspace_root / "draft-review.md"
+        orchestrated = executor.run(
+            build_refinement_orchestrator(self.settings),
+            self._build_refinement_orchestrator_prompt(
                 case_number=case_input.case_number,
-                draft_path=draft_path,
                 initialization=initialization,
                 source_bundle=source_bundle,
+                draft_path=draft_path,
+                review_path=review_path,
             ),
+            output_type=OrchestratedRefinementOutput,
         )
-        draft_path.write_text(str(draft_text).strip() + "\n", encoding="utf-8")
+        draft_path.write_text(orchestrated.draft_markdown.strip() + "\n", encoding="utf-8")
+        review_path.write_text(orchestrated.review_markdown.strip() + "\n", encoding="utf-8")
         _validate_required_output(draft_path)
+        _validate_required_output(review_path)
 
+        critique = orchestrated.critique
         iterations: list[RefinementIteration] = []
-        review_path = workspace_root / "draft-review.md"
-
-        review_text = str(
-            executor.run(
-                build_review_agent(self.settings),
-                self._build_review_prompt(
-                    case_number=case_input.case_number,
-                    initialization=initialization,
-                    source_bundle=source_bundle,
-                    draft_path=draft_path,
-                ),
-            )
-        ).strip()
-        review_path.write_text(review_text, encoding="utf-8")
-        critique = executor.run(
-            build_critique_extractor(self.settings),
-            f"Extract the structured critique from this review:\n\n{review_text}",
-            output_type=Critique,
-        )
-
-        if critique.outcome == critique.outcome.blocked:
+        if orchestrated.initial_critique is not None:
             iterations.append(
-                RefinementIteration(iteration=1, critique=critique, revised=False)
-            )
-            raise RuntimeError("Draft review was blocked")
-
-        if critique.outcome not in ACCEPTED_REVIEW_OUTCOMES or critique.score < 8:
-            iterations.append(
-                RefinementIteration(iteration=1, critique=critique, revised=True)
-            )
-            revised_draft = executor.run(
-                build_revise_agent(self.settings),
-                self._build_revision_prompt(
-                    case_number=case_input.case_number,
-                    initialization=initialization,
-                    source_bundle=source_bundle,
-                    draft_path=draft_path,
-                    review_path=review_path,
-                ),
-            )
-            draft_path.write_text(str(revised_draft).strip() + "\n", encoding="utf-8")
-            _validate_required_output(draft_path)
-            review_text = str(
-                executor.run(
-                    build_review_agent(self.settings),
-                    self._build_review_prompt(
-                        case_number=case_input.case_number,
-                        initialization=initialization,
-                        source_bundle=source_bundle,
-                        draft_path=draft_path,
-                    ),
+                RefinementIteration(
+                    iteration=1,
+                    critique=orchestrated.initial_critique,
+                    revised=orchestrated.revision_used,
                 )
-            ).strip()
-            review_path.write_text(review_text, encoding="utf-8")
-            critique = executor.run(
-                build_critique_extractor(self.settings),
-                f"Extract the structured critique from this review:\n\n{review_text}",
-                output_type=Critique,
             )
             iterations.append(
                 RefinementIteration(iteration=2, critique=critique, revised=False)
             )
-            if critique.outcome == critique.outcome.blocked:
-                raise RuntimeError("Draft review was blocked")
-            if critique.outcome not in ACCEPTED_REVIEW_OUTCOMES or critique.score < 8:
-                raise RuntimeError(
-                    "Draft refinement exhausted maximum iterations without approval"
-                )
         else:
             iterations.append(
                 RefinementIteration(iteration=1, critique=critique, revised=False)
+            )
+
+        if critique.outcome == critique.outcome.blocked:
+            raise RuntimeError("Draft review was blocked")
+        if critique.outcome not in ACCEPTED_REVIEW_OUTCOMES or critique.score < 8:
+            raise RuntimeError(
+                "Draft refinement exhausted maximum iterations without approval"
             )
 
         refinement_result = RefinementResult(
@@ -373,4 +327,32 @@ class RunService:
             f"{cls._format_document_block('Current Draft', draft_path)}\n\n"
             f"{cls._format_document_block('Review Findings', review_path)}\n\n"
             f"{cls._format_source_documents(source_bundle, total_limit=REVISION_SOURCE_CHAR_LIMIT)}"
+        )
+
+    @classmethod
+    def _build_refinement_orchestrator_prompt(
+        cls,
+        *,
+        case_number: str,
+        initialization: CaseInitialization,
+        source_bundle: SourceBundle,
+        draft_path: Path,
+        review_path: Path,
+    ) -> str:
+        instructions_path = (
+            initialization.asset_root / "instructions" / "INSTRUCTIONS.md"
+        )
+        template_path = initialization.asset_root / "instructions" / "case-template.md"
+        return (
+            f"Case number: {case_number}\n"
+            f"Destination draft path: {draft_path}\n"
+            f"Destination review path: {review_path}\n\n"
+            "Run the complete drafting-and-refinement workflow in one orchestrated pass.\n"
+            "Case initialization, source gathering, and news gathering are already complete before this prompt.\n"
+            "Start from the provided source documents only, then draft, review, extract critique, and optionally revise once before re-reviewing.\n"
+            "Prefer primary source facts, avoid unsupported claims, and keep the final draft publishable in Nepali markdown.\n"
+            "Return the final structured orchestrated refinement output only.\n\n"
+            f"{cls._format_document_block('Workflow Instructions', instructions_path, max_chars=ORCHESTRATOR_INSTRUCTIONS_CHAR_LIMIT)}\n\n"
+            f"{cls._format_document_block('Case Template', template_path, max_chars=ORCHESTRATOR_TEMPLATE_CHAR_LIMIT)}\n\n"
+            f"{cls._format_source_documents(source_bundle, total_limit=ORCHESTRATOR_SOURCE_CHAR_LIMIT)}"
         )
