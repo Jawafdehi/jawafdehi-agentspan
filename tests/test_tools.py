@@ -7,8 +7,8 @@ import pytest
 from jawafdehi_agentspan.settings import get_settings
 from jawafdehi_agentspan.tools import (
     append_global_source_file,
-    list_global_source_files,
     append_workspace_file,
+    list_global_source_files,
     list_workspace_files,
     read_reference_file,
     write_global_source_file,

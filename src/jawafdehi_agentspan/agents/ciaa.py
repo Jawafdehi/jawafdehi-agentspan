@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentspan.agents import Agent
+from agentspan.agents import Agent, ConversationMemory
 
 from jawafdehi_agentspan.models import (
-    CaseInitialization,
-    Critique,
-    OrchestratedRefinementOutput,
     PublishedCaseResult,
     SourceBundle,
 )
@@ -17,218 +14,140 @@ from jawafdehi_agentspan.tools import (
     convert_to_markdown,
     fetch_url,
     gather_news_step,
-    gather_sources_step,
-    initialize_casework_step,
     publish_case_step,
     run_shell_command,
 )
 
-_HERE = Path(__file__).parent
+_PROMPTS_DIR = Path(__file__).resolve().parents[3] / "assets" / "prompts"
 
 
 def _load(filename: str) -> str:
-    return (_HERE / filename).read_text(encoding="utf-8").strip()
+    return (_PROMPTS_DIR / filename).read_text(encoding="utf-8").strip()
 
 
-def build_initialize_agent(settings: Settings) -> Agent:
-    return Agent(
-        name="ciaa_initialize",
-        model=settings.llm_model,
-        instructions=(
-            "Initialize a CIAA casework run. "
-            "Call initialize_casework_step exactly once using the case "
-            "number and workspace path from the prompt, then return the "
-            "structured initialization payload."
-        ),
-        tools=[initialize_casework_step],
-        required_tools=["initialize_casework_step"],
-        output_type=CaseInitialization,
-        max_turns=2,
-    )
-
-
-def build_source_agent(settings: Settings) -> Agent:
-    return Agent(
-        name="ciaa_source_gatherer",
-        model=settings.llm_model,
-        instructions=(
-            "Gather official case sources. "
-            "Call gather_sources_step exactly once using the serialized "
-            "initialization payload from the prompt, then return the "
-            "updated source bundle."
-        ),
-        tools=[gather_sources_step],
-        required_tools=["gather_sources_step"],
-        output_type=SourceBundle,
-        max_turns=2,
-    )
+def _memory() -> ConversationMemory:
+    return ConversationMemory(max_messages=100)
 
 
 def build_news_agent(settings: Settings) -> Agent:
+    # TODO: We don't need news agent right now.
+    # This will be worked upon later.
     return Agent(
         name="ciaa_news_gatherer",
         model=settings.llm_model,
-        instructions=(
-            "Gather relevant news coverage. "
-            "Call gather_news_step exactly once using the serialized "
-            "source bundle from the prompt, then return the updated "
-            "source bundle."
-        ),
+        instructions=_load("news-gatherer.md"),
         tools=[gather_news_step, brave_search, fetch_url, convert_to_markdown],
         required_tools=["gather_news_step"],
         output_type=SourceBundle,
+        memory=_memory(),
         max_turns=2,
     )
 
 
 def build_draft_agent(settings: Settings) -> Agent:
-    instructions = "\n\n".join(
-        [
-            _load("drafter.md"),
-            _load("case-template.md"),
-            (
-                "Source documents are not embedded inline. The prompt includes a "
-                "Source Manifest with exact file paths. Use run_shell_command with "
-                "`cat <path>` to read each file directly. Prefer markdown_path over "
-                "raw_path. Read the source files first, then write the draft."
-            ),
-        ]
-    )
     return Agent(
-        name="ciaa_drafter",
+        name="create-ciaa-case-draft",
         model=settings.llm_model,
-        instructions=instructions,
+        instructions="\n\n".join([_load("drafter.md"), _load("case-template.md")]),
         tools=[run_shell_command],
+        memory=_memory(),
         max_turns=10,
     )
 
 
 def build_review_agent(settings: Settings) -> Agent:
-    instructions = "\n\n".join(
-        [
-            _load("reviewer.md"),
-            (
-                "Source documents are not embedded inline. The prompt includes a "
-                "Source Manifest with exact file paths. Use run_shell_command with "
-                "`cat <path>` to read each file directly. Prefer markdown_path over "
-                "raw_path."
-            ),
-        ]
-    )
     return Agent(
-        name="ciaa_reviewer",
+        name="draft-reviewer",
         model=settings.llm_model,
-        instructions=instructions,
+        instructions=_load("reviewer.md"),
         tools=[run_shell_command],
+        memory=_memory(),
         max_turns=10,
     )
 
 
 def build_critique_extractor(settings: Settings) -> Agent:
     return Agent(
-        name="ciaa_critique_extractor",
+        name="review-critique",
         model=settings.llm_model,
-        instructions=(
-            "Extract a structured critique from the provided review text. "
-            "You are a deterministic JSON extractor, not a reviewer. "
-            "Never return an empty object, prose, markdown, or code fences. "
-            "Always return all required fields in valid JSON: "
-            "score (integer 1-10), outcome (one of: "
-            '"approved", "approved_with_minor_edits", '
-            '"needs_revision", "blocked"), '
-            "strengths (array of strings), improvements (array of strings), "
-            "blockers (array of strings). "
-            "Infer the outcome from the review recommendation even if "
-            "phrased informally. "
-            "Infer the score conservatively from the review if needed. "
-            "If the review recommends revision, set outcome to needs_revision. "
-            "If the review says blocked or identifies blocking factual "
-            "issues, set outcome to blocked. "
-            "If the review is positive with only small edits, set outcome "
-            "to approved_with_minor_edits or approved as appropriate. "
-            "Lists may be empty, but the keys must always be present. "
-            "Do not use any tools. Return only the JSON object."
-        ),
-        output_type=Critique,
+        instructions=_load("critique-extractor.md"),
+        memory=_memory(),
         max_turns=2,
     )
 
 
 def build_revise_agent(settings: Settings) -> Agent:
-    instructions = "\n\n".join(
-        [
-            _load("reviser.md"),
-            (
-                "Revise the provided draft to address every critical and major "
-                "issue, plus straightforward minor ones. "
-                "All content is provided inline in the prompt - do not attempt "
-                "to read files or call any tools. "
-                "Return only the improved Nepali Markdown draft text, without "
-                "code fences."
-            ),
-        ]
-    )
     return Agent(
-        name="ciaa_reviser",
+        name="case-revisor",
         model=settings.llm_model,
-        instructions=instructions,
+        instructions=_load("reviser.md"),
+        memory=_memory(),
         max_turns=2,
     )
 
 
 def build_publish_agent(settings: Settings) -> Agent:
     return Agent(
-        name="ciaa_publisher",
+        name="case-publisher",
         model=settings.llm_model,
-        instructions=(
-            "Publish and finalize the approved case. "
-            "Call publish_case_step exactly once using the serialized "
-            "publish payload from the prompt, then return the structured "
-            "publication result."
-        ),
+        instructions=_load("publisher.md"),
         tools=[publish_case_step],
         required_tools=["publish_case_step"],
         output_type=PublishedCaseResult,
+        memory=_memory(),
         max_turns=2,
     )
 
 
-def build_refinement_orchestrator(settings: Settings) -> Agent:
+def build_case_draft_router(settings: Settings) -> Agent:
     return Agent(
-        name="ciaa_refinement_orchestrator",
+        name="case-draft-router",
         model=settings.llm_model,
-        instructions=(
-            "You orchestrate a single CIAA draft-refinement workflow across "
-            "specialist sub-agents. "
-            "Initialization, source gathering, and news gathering are already "
-            "complete in Python before this agent starts. "
-            "Do not call initialize, source gathering, or news gathering "
-            "specialists. "
-            "A traversal history section may be included in the prompt. Treat "
-            "it as workflow control state only, not as factual case evidence. "
-            "Begin from the provided case context and source documents, then "
-            "use only the drafting, review, critique extraction, and "
-            "optional single revision specialists. "
-            "If the extracted critique says blocked, stop and return the "
-            "final blocked result. "
-            "If the extracted critique says approved or "
-            "approved_with_minor_edits and the score is at least 8, stop and "
-            "return the final result. "
-            "Otherwise, you may use the reviser exactly once, then run "
-            "reviewer and critique extractor one more time. "
-            "Never revise more than once. Never publish. "
-            "Return only the final structured "
-            "OrchestratedRefinementOutput with the final draft, final review, "
-            "final critique, whether revision was used, and the initial "
-            "critique when a revision happened."
-        ),
+        instructions=_load("case-draft-router.md"),
+        memory=_memory(),
+    )
+
+
+def build_case_draft_agent(settings: Settings) -> Agent:
+    return Agent(
+        name="case-draft",
+        model=settings.llm_model,
+        instructions=_load("case-draft.md"),
         agents=[
             build_draft_agent(settings),
             build_review_agent(settings),
             build_critique_extractor(settings),
             build_revise_agent(settings),
         ],
-        strategy="handoff",
-        output_type=OrchestratedRefinementOutput,
+        strategy="router",
+        router=build_case_draft_router(settings),
+        memory=_memory(),
+        max_turns=8,
+    )
+
+
+def build_prepare_information_agent(settings: Settings) -> Agent:
+    return Agent(
+        name="prepare-information",
+        model=settings.llm_model,
+        instructions=_load("prepare-information.md"),
+        tools=[run_shell_command, fetch_url, convert_to_markdown],
+        memory=_memory(),
+        max_turns=10,
+    )
+
+
+def build_ciaa_orchestrator(settings: Settings, router) -> Agent:
+    return Agent(
+        name="orchestrator",
+        model=settings.llm_model,
+        instructions=_load("orchestrator.md"),
+        agents=[
+            build_prepare_information_agent(settings),
+            build_case_draft_agent(settings),
+            build_publish_agent(settings),
+        ],
+        strategy="router",
+        router=router,
         max_turns=6,
     )

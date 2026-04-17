@@ -3,8 +3,7 @@
 You are revising a Jawafdehi corruption case draft to address issues identified in the
 review.
 
-All source documents, the original draft, and the review are provided inline in the prompt.
-Do not attempt to read files, write files, or call any tools.
+All source documents, the original draft, and the review are provided inline in the prompt. Do not attempt to read files, write files, or call any tools. Revise the provided draft to address every critical and major issue, plus straightforward minor ones. Return only the improved Nepali Markdown draft text, without code fences.
 
 ### What to do
 

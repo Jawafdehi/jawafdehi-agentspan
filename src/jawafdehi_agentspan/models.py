@@ -20,19 +20,6 @@ class CIAACaseInput(BaseModel):
     case_number: AcceptedCIAACaseNumber
 
 
-class ReviewOutcome(str, Enum):
-    approved = "approved"
-    approved_with_minor_edits = "approved_with_minor_edits"
-    needs_revision = "needs_revision"
-    blocked = "blocked"
-
-
-ACCEPTED_REVIEW_OUTCOMES = {
-    ReviewOutcome.approved,
-    ReviewOutcome.approved_with_minor_edits,
-}
-
-
 class WorkspaceContext(BaseModel):
     root_dir: Path
     logs_dir: Path
@@ -78,54 +65,10 @@ class SourceBundle(BaseModel):
     news_artifacts: list[SourceArtifact] = Field(default_factory=list)
 
 
-class Critique(BaseModel):
-    score: int = Field(ge=1, le=10)
-    outcome: ReviewOutcome
-    strengths: list[str] = Field(default_factory=list)
-    improvements: list[str] = Field(default_factory=list)
-    blockers: list[str] = Field(default_factory=list)
-
-
-class RefinementIteration(BaseModel):
-    iteration: int
-    critique: Critique
-    revised: bool
-
-
-class TraversalNodeStatus(str, Enum):
-    completed = "completed"
-    pending = "pending"
-    conditional = "conditional"
-
-
-class TraversalNode(BaseModel):
-    node_name: str
-    status: TraversalNodeStatus
-    notes: str | None = None
-
-
-class OrchestratedRefinementOutput(BaseModel):
-    draft_markdown: str
-    review_markdown: str
-    critique: Critique
-    revision_used: bool = False
-    initial_critique: Critique | None = None
-    traversal_history: list[TraversalNode] = Field(default_factory=list)
-
-
-class RefinementResult(BaseModel):
-    workspace: WorkspaceContext
-    draft_path: Path
-    review_path: Path
-    final_score: int
-    final_outcome: ReviewOutcome
-    iterations: list[RefinementIteration] = Field(default_factory=list)
-
-
 class PublishInput(BaseModel):
     case_number: str
     source_bundle: SourceBundle
-    refinement_result: RefinementResult
+    draft_path: Path
 
 
 class PublishedCaseResult(BaseModel):
@@ -139,4 +82,3 @@ class WorkflowResult(BaseModel):
     case_number: str
     published: bool
     case_id: int | None = None
-    final_outcome: ReviewOutcome

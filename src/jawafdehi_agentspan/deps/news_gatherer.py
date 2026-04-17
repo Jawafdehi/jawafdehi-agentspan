@@ -106,7 +106,9 @@ class SearchBackedNewsGatherer:
     ) -> list[str]:
         queries: list[str] = [case_number]
         if press_release_title:
-            queries.append(f'{case_number} "{cls._normalize_whitespace(press_release_title)}"')
+            queries.append(
+                f'{case_number} "{cls._normalize_whitespace(press_release_title)}"'
+            )
 
         phrases = cls._extract_candidate_phrases(press_release_text)
         for phrase in phrases:
@@ -123,7 +125,9 @@ class SearchBackedNewsGatherer:
                 break
 
         if len(queries) < 4 and charge_sheet_title:
-            queries.append(f'{case_number} "{cls._normalize_whitespace(charge_sheet_title)}"')
+            queries.append(
+                f'{case_number} "{cls._normalize_whitespace(charge_sheet_title)}"'
+            )
 
         deduped: list[str] = []
         seen: set[str] = set()
@@ -165,13 +169,17 @@ class SearchBackedNewsGatherer:
         press_release_text = self._extract_press_release_text(source_bundle)
         queries = self._select_press_release_queries(
             source_bundle.case_number,
-            source_bundle.press_release_artifact.title
-            if source_bundle.press_release_artifact is not None
-            else None,
+            (
+                source_bundle.press_release_artifact.title
+                if source_bundle.press_release_artifact is not None
+                else None
+            ),
             press_release_text,
-            source_bundle.charge_sheet_artifact.title
-            if source_bundle.charge_sheet_artifact is not None
-            else None,
+            (
+                source_bundle.charge_sheet_artifact.title
+                if source_bundle.charge_sheet_artifact is not None
+                else None
+            ),
         )
         logger.info(
             "[%s] gather_news: generated %d dynamic queries from press release context",

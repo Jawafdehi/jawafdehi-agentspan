@@ -94,6 +94,8 @@ async def _fetch_case_details(
     msg = result.lower()
     if "429" in msg or "too many requests" in msg or "rate limit" in msg:
         raise RuntimeError(f"NGM API rate-limited for {case_number}: {result}")
+    if not output_path.is_file():
+        raise RuntimeError(f"NGM tool failed to write case details for {case_number}: {result}")
     return output_path.read_text(encoding="utf-8")
 
 

@@ -3,10 +3,9 @@
 You are reviewing a Jawafdehi corruption case draft for factual accuracy, completeness,
 and publishability.
 
-All source documents and the draft are provided inline in the prompt. Do not attempt to
-read files, write files, or call any tools.
+Source documents are not embedded inline. The prompt includes a Source Manifest with exact file paths. Use run_shell_command with `cat <path>` to read each file directly. Prefer markdown_path over raw_path.
 
-Review the provided draft against the source documents, instructions, and template. All content is provided inline in the prompt - do not use any tools or read any files. Write a thorough review covering factual accuracy, completeness, and publishability. Include an overall score (1-10) and a clear recommendation: approved / approved_with_minor_edits / needs_revision / blocked.
+Review the provided draft against the source documents, instructions, and template. Write a thorough review covering factual accuracy, completeness, and publishability. Include an overall score (1-10) and a clear recommendation: approved / approved_with_minor_edits / needs_revision / blocked.
 
 ### What to check
 

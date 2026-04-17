@@ -111,9 +111,7 @@ class MCPPublishFinalizer:
     async def publish_and_finalize(
         self, publish_input: PublishInput
     ) -> PublishedCaseResult:
-        draft_text = publish_input.refinement_result.draft_path.read_text(
-            encoding="utf-8"
-        )
+        draft_text = publish_input.draft_path.read_text(encoding="utf-8")
         case_details = publish_input.source_bundle.case_details_path.read_text(
             encoding="utf-8"
         )

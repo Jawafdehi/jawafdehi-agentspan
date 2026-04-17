@@ -7,37 +7,25 @@ import pytest
 from jawafdehi_agentspan.assets import ciaa_workflow_root
 from jawafdehi_agentspan.models import (
     CaseInitialization,
-    Critique,
     PublishedCaseResult,
-    ReviewOutcome,
     SourceArtifact,
     SourceBundle,
-    TraversalNode,
-    TraversalNodeStatus,
     WorkflowResult,
     WorkspaceContext,
 )
 from jawafdehi_agentspan.run_service import RunService
 from jawafdehi_agentspan.settings import Settings
+from jawafdehi_agentspan.workspace import global_raw_sources_dir
 
 _DRAFT_MARKDOWN = (
     "# Jawafdehi Case Draft\n\n"
-    "## Title\nनमुना मुद्दा\n\n"
-    "## Short Description\nछोटो विवरण\n\n"
-    "## Key Allegations\n- आरोप १\n- आरोप २\n\n"
-    "## Timeline\n- 2082-01-01: दर्ता\n\n"
-    "## Description\n" + ("विस्तृत विवरण।" * 60) + "\n"
-)
-_REVISED_DRAFT_MARKDOWN = (
-    "# Jawafdehi Case Draft\n\n"
-    "## Title\nनमुना मुद्दा\n\n"
-    "## Short Description\nछोटो विवरण\n\n"
-    "## Key Allegations\n- आरोप १\n- आरोप २\n\n"
-    "## Timeline\n- 2082-01-01: दर्ता\n\n"
-    "## Description\n" + ("सुधार गरिएको विस्तृत विवरण।" * 60) + "\n"
+    "## Title\nu0928u092eu0941u0928u093e u092eu0941u0926u094du0926u093e\n\n"
+    "## Short Description\nu091bu094bu091fu094b u0935u093fu0935u0930u0923\n\n"
+    "## Key Allegations\n- u0906u0930u094bu092a u0967\n- u0906u0930u094bu092a u0968\n\n"
+    "## Timeline\n- 2082-01-01: u0926u0930u094du0924u093e\n\n"
+    "## Description\n" + ("u0935u093fu0938u094du0924u0943u0924 u0935u093fu0935u0930u0923u0964" * 60) + "\n"
 )
 _REVIEW_MARKDOWN = "## Overall Review\n\nInitial review result\n"
-_REVISED_REVIEW_MARKDOWN = "## Overall Review\n\nRe-review result\n"
 
 
 def _workspace(tmp_path: Path) -> WorkspaceContext:
@@ -113,20 +101,13 @@ def _source_bundle(initialization: CaseInitialization) -> SourceBundle:
 
 
 class FakeExecutor:
-    """Simulates per-node agent calls for the deterministic refinement flow."""
+    """Writes draft-final.md to workspace when the case-draft agent runs."""
 
-    def __init__(
-        self,
-        critiques: list[Critique],
-        publish_case_id: int = 7,
-    ) -> None:
-        self.critiques = list(critiques)
+    def __init__(self, publish_case_id: int = 7) -> None:
         self.publish_case_id = publish_case_id
-        self.drafter_calls: int = 0
-        self.reviewer_calls: int = 0
-        self.critique_extractor_calls: int = 0
-        self.reviser_calls: int = 0
-        self._critique_index: int = 0
+        self.calls: list[str] = []
+        self._workspace_root: Path | None = None
+        self._press_release_path: Path | None = None
 
     def __enter__(self):
         return self
@@ -135,22 +116,20 @@ class FakeExecutor:
         return None
 
     def run(self, agent, prompt: str, output_type=None):
-        if agent.name == "ciaa_drafter":
-            self.drafter_calls += 1
-            return _DRAFT_MARKDOWN if self.reviser_calls == 0 else _REVISED_DRAFT_MARKDOWN
-        if agent.name == "ciaa_reviewer":
-            self.reviewer_calls += 1
-            return _REVIEW_MARKDOWN if self.reviser_calls == 0 else _REVISED_REVIEW_MARKDOWN
-        if agent.name == "ciaa_critique_extractor":
-            self.critique_extractor_calls += 1
-            critique = self.critiques[self._critique_index]
-            if self._critique_index < len(self.critiques) - 1:
-                self._critique_index += 1
-            return critique
-        if agent.name == "ciaa_reviser":
-            self.reviser_calls += 1
-            return _REVISED_DRAFT_MARKDOWN
-        raise AssertionError(f"Unexpected agent {agent.name}")
+        self.calls.append(agent.name)
+        if agent.name == "orchestrator":
+            # Simulate the router dispatching through phases
+            if self._press_release_path and not self._press_release_path.is_file():
+                self._press_release_path.parent.mkdir(parents=True, exist_ok=True)
+                self._press_release_path.write_text("pdf", encoding="utf-8")
+            if self._workspace_root is not None:
+                (self._workspace_root / "draft-final.md").write_text(
+                    _DRAFT_MARKDOWN, encoding="utf-8"
+                )
+                (self._workspace_root / "draft-review.md").write_text(
+                    _REVIEW_MARKDOWN, encoding="utf-8"
+                )
+        return None
 
 
 class FakeAdapter:
@@ -203,11 +182,13 @@ class FakeDependencies:
 def _service_with_executor(
     executor: FakeExecutor,
     source_bundle: SourceBundle,
+    settings: Settings | None = None,
 ) -> RunService:
-    settings = Settings(
-        JAWAFDEHI_API_TOKEN="test-token",
-        OPENAI_API_KEY="test-key",
-    )
+    if settings is None:
+        settings = Settings(
+            JAWAFDEHI_API_TOKEN="test-token",
+            OPENAI_API_KEY="test-key",
+        )
     return RunService(
         dependencies=FakeDependencies(source_bundle, executor.publish_case_id),
         executor_factory=lambda: executor,
@@ -220,199 +201,75 @@ def _case_input(case_number: str):
 
 
 # ---------------------------------------------------------------------------
-# Traversal history helpers
+# Router
 # ---------------------------------------------------------------------------
 
 
-def test_initial_traversal_history_has_correct_nodes():
-    history = RunService._initial_traversal_history()
-    names = [n.node_name for n in history]
-    assert names == [
-        "initialize_casework",
-        "gather_sources",
-        "gather_news",
-        "drafter",
-        "reviewer",
-        "critique_extractor",
-        "reviser",
-        "reviewer",
-        "critique_extractor",
-    ]
-
-
-def test_initial_traversal_history_statuses():
-    history = RunService._initial_traversal_history()
-    completed = [n for n in history if n.status == TraversalNodeStatus.completed]
-    pending = [n for n in history if n.status == TraversalNodeStatus.pending]
-    conditional = [n for n in history if n.status == TraversalNodeStatus.conditional]
-    assert [n.node_name for n in completed] == [
-        "initialize_casework",
-        "gather_sources",
-        "gather_news",
-    ]
-    assert [n.node_name for n in pending] == [
-        "drafter",
-        "reviewer",
-        "critique_extractor",
-    ]
-    assert [n.node_name for n in conditional] == [
-        "reviser",
-        "reviewer",
-        "critique_extractor",
-    ]
-
-
-def test_complete_next_node_updates_first_matching_pending():
-    history = RunService._initial_traversal_history()
-    RunService._complete_next_node(history, "drafter")
-    drafter = next(n for n in history if n.node_name == "drafter")
-    assert drafter.status == TraversalNodeStatus.completed
-
-
-def test_complete_next_node_with_notes():
-    history = RunService._initial_traversal_history()
-    RunService._complete_next_node(history, "drafter")
-    RunService._complete_next_node(history, "reviewer")
-    RunService._complete_next_node(history, "critique_extractor", "approved")
-    ce = next(
-        n
-        for n in history
-        if n.node_name == "critique_extractor" and n.status == TraversalNodeStatus.completed
+def test_router_routes_to_prepare_information_when_no_press_release(tmp_path: Path):
+    initialization = _initialization(tmp_path)
+    workspace_root = initialization.workspace.root_dir
+    settings = Settings(JAWAFDEHI_API_TOKEN="t", OPENAI_API_KEY="k")
+    service = RunService(settings=settings)
+    router = service._make_router(
+        case_number=initialization.case_number,
+        workspace_root=workspace_root,
     )
-    assert ce.notes == "approved"
+    assert router("anything") == "prepare-information"
 
 
-def test_complete_next_node_does_not_double_complete():
-    history = RunService._initial_traversal_history()
-    RunService._complete_next_node(history, "drafter")
-    RunService._complete_next_node(history, "reviewer")
-    RunService._complete_next_node(history, "critique_extractor")
-    # activate revision path so second reviewer/critique_extractor become pending
-    RunService._activate_revision_path(history)
-    RunService._complete_next_node(history, "reviser")
-    RunService._complete_next_node(history, "reviewer")
-    RunService._complete_next_node(history, "critique_extractor")
-    completed = [n for n in history if n.status == TraversalNodeStatus.completed]
-    assert len(completed) == len(history)
+def test_router_routes_to_case_draft_when_press_release_exists(tmp_path: Path):
+    initialization = _initialization(tmp_path)
+    workspace_root = initialization.workspace.root_dir
+    settings = Settings(JAWAFDEHI_API_TOKEN="t", OPENAI_API_KEY="k")
+    service = RunService(settings=settings)
+
+    press_release = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    press_release.parent.mkdir(parents=True, exist_ok=True)
+    press_release.write_text("pdf", encoding="utf-8")
+
+    router = service._make_router(
+        case_number=initialization.case_number,
+        workspace_root=workspace_root,
+    )
+    assert router("anything") == "case-draft"
 
 
-def test_activate_revision_path_changes_conditional_to_pending():
-    history = RunService._initial_traversal_history()
-    RunService._activate_revision_path(history)
-    conditional = [n for n in history if n.status == TraversalNodeStatus.conditional]
-    assert conditional == []
-    pending = [n for n in history if n.status == TraversalNodeStatus.pending]
-    pending_names = [n.node_name for n in pending]
-    assert "reviser" in pending_names
+def test_router_routes_to_publisher_when_draft_final_exists(tmp_path: Path):
+    initialization = _initialization(tmp_path)
+    workspace_root = initialization.workspace.root_dir
+    settings = Settings(JAWAFDEHI_API_TOKEN="t", OPENAI_API_KEY="k")
+    service = RunService(settings=settings)
 
+    press_release = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    press_release.parent.mkdir(parents=True, exist_ok=True)
+    press_release.write_text("pdf", encoding="utf-8")
+    (workspace_root / "draft-final.md").write_text("draft", encoding="utf-8")
 
-def test_format_traversal_history_renders_all_nodes():
-    history = RunService._initial_traversal_history()
-    rendered = RunService._format_traversal_history(history)
-    assert "- initialize_casework: completed" in rendered
-    assert "- gather_sources: completed" in rendered
-    assert "- gather_news: completed" in rendered
-    assert "- drafter: pending" in rendered
-    assert "- reviewer: pending" in rendered
-    assert "- critique_extractor: pending" in rendered
-    assert "- reviser: conditional" in rendered
-
-
-def test_format_traversal_history_includes_notes():
-    history = [
-        TraversalNode(
-            node_name="critique_extractor",
-            status=TraversalNodeStatus.completed,
-            notes="needs_revision",
-        )
-    ]
-    rendered = RunService._format_traversal_history(history)
-    assert "- critique_extractor: completed (needs_revision)" in rendered
+    router = service._make_router(
+        case_number=initialization.case_number,
+        workspace_root=workspace_root,
+    )
+    assert router("anything") == "case-publisher"
 
 
 # ---------------------------------------------------------------------------
-# Prompt builders
+# Prompt helpers
 # ---------------------------------------------------------------------------
 
 
-def test_build_draft_prompt_includes_traversal_history(tmp_path: Path):
+def test_build_prompt_includes_case_number(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
-    history = RunService._initial_traversal_history()
 
-    prompt = RunService._build_draft_prompt(
+    prompt = RunService._build_prompt(
         case_number=initialization.case_number,
+        workspace_root=initialization.workspace.root_dir,
         source_bundle=source_bundle,
-        traversal_history=history,
     )
 
-    assert "## Traversal History" in prompt
-    assert "- drafter: pending" in prompt
+    assert "Case number: 081-CR-0046" in prompt
     assert "## Source Manifest" in prompt
-
-
-def test_build_review_prompt_includes_draft_and_history(tmp_path: Path):
-    initialization = _initialization(tmp_path)
-    source_bundle = _source_bundle(initialization)
-    history = RunService._initial_traversal_history()
-    RunService._complete_next_node(history, "drafter")
-
-    prompt = RunService._build_review_prompt(
-        case_number=initialization.case_number,
-        source_bundle=source_bundle,
-        draft_markdown="# Draft\n",
-        traversal_history=history,
-    )
-
-    assert "## Traversal History" in prompt
-    assert "- drafter: completed" in prompt
-    assert "## Draft Markdown" in prompt
-    assert "# Draft" in prompt
-
-
-def test_build_critique_prompt_includes_review_and_history():
-    history = RunService._initial_traversal_history()
-    RunService._complete_next_node(history, "drafter")
-    RunService._complete_next_node(history, "reviewer")
-
-    prompt = RunService._build_critique_prompt(
-        review_markdown="## Review\n",
-        traversal_history=history,
-    )
-
-    assert "## Traversal History" in prompt
-    assert "- reviewer: completed" in prompt
-    assert "## Review Markdown" in prompt
-
-
-def test_build_revise_prompt_includes_all_sections(tmp_path: Path):
-    initialization = _initialization(tmp_path)
-    source_bundle = _source_bundle(initialization)
-    history = RunService._initial_traversal_history()
-    RunService._complete_next_node(history, "drafter")
-    RunService._complete_next_node(history, "reviewer")
-    RunService._complete_next_node(history, "critique_extractor", "needs_revision")
-    RunService._activate_revision_path(history)
-    critique = Critique(
-        score=5,
-        outcome=ReviewOutcome.needs_revision,
-        improvements=["More detail"],
-    )
-
-    prompt = RunService._build_revise_prompt(
-        case_number=initialization.case_number,
-        source_bundle=source_bundle,
-        draft_markdown="# Draft\n",
-        review_markdown="## Review\n",
-        critique=critique,
-        traversal_history=history,
-    )
-
-    assert "## Traversal History" in prompt
-    assert "- reviser: pending" in prompt
-    assert "## Current Draft Markdown" in prompt
-    assert "## Review Markdown" in prompt
-    assert "## Structured Critique" in prompt
+    assert "Charge Sheet" in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -423,10 +280,11 @@ def test_build_revise_prompt_includes_all_sections(tmp_path: Path):
 def test_run_service_happy_path(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
-    executor = FakeExecutor(
-        critiques=[Critique(score=9, outcome=ReviewOutcome.approved)],
-    )
-    service = _service_with_executor(executor, source_bundle)
+    settings = Settings(JAWAFDEHI_API_TOKEN="test-token", OPENAI_API_KEY="test-key")
+    executor = FakeExecutor()
+    executor._workspace_root = initialization.workspace.root_dir
+    executor._press_release_path = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    service = _service_with_executor(executor, source_bundle, settings)
 
     result = service._run(
         case_input=_case_input(initialization.case_number),
@@ -437,141 +295,39 @@ def test_run_service_happy_path(tmp_path: Path):
     assert isinstance(result, WorkflowResult)
     assert result.published is True
     assert result.case_id == 7
-    assert executor.drafter_calls == 1
-    assert executor.reviewer_calls == 1
-    assert executor.critique_extractor_calls == 1
-    assert executor.reviser_calls == 0
+    assert "orchestrator" in executor.calls
 
 
-def test_run_service_revises_once_then_publishes(tmp_path: Path):
+def test_run_service_fails_if_draft_final_not_written(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
-    executor = FakeExecutor(
-        critiques=[
-            Critique(
-                score=7,
-                outcome=ReviewOutcome.needs_revision,
-                improvements=["More detail"],
-            ),
-            Critique(score=9, outcome=ReviewOutcome.approved),
-        ],
-    )
+    executor = FakeExecutor()
+    # Do NOT set _workspace_root so draft-final.md is never written
     service = _service_with_executor(executor, source_bundle)
 
-    result = service._run(
-        case_input=_case_input(initialization.case_number),
-        workspace_root=initialization.workspace.root_dir,
-        executor=executor,
-    )
-
-    assert result.published is True
-    assert executor.drafter_calls == 1
-    assert executor.reviewer_calls == 2
-    assert executor.critique_extractor_calls == 2
-    assert executor.reviser_calls == 1
-
-
-def test_run_service_blocks_publication(tmp_path: Path):
-    initialization = _initialization(tmp_path)
-    source_bundle = _source_bundle(initialization)
-    executor = FakeExecutor(
-        critiques=[
-            Critique(
-                score=2,
-                outcome=ReviewOutcome.blocked,
-                blockers=["Unsupported allegation"],
-            )
-        ],
-    )
-    service = _service_with_executor(executor, source_bundle)
-
-    with pytest.raises(RuntimeError, match="blocked"):
+    with pytest.raises(RuntimeError, match="Expected output file was not created"):
         service._run(
             case_input=_case_input(initialization.case_number),
             workspace_root=initialization.workspace.root_dir,
             executor=executor,
         )
 
-    assert executor.reviser_calls == 0
 
-
-def test_run_service_fails_after_final_review_needs_revision(tmp_path: Path):
+def test_run_service_writes_draft_final(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
-    executor = FakeExecutor(
-        critiques=[
-            Critique(
-                score=7,
-                outcome=ReviewOutcome.needs_revision,
-                improvements=["More detail"],
-            ),
-            Critique(
-                score=7,
-                outcome=ReviewOutcome.needs_revision,
-                improvements=["Still more detail"],
-            ),
-        ],
-    )
-    service = _service_with_executor(executor, source_bundle)
+    settings = Settings(JAWAFDEHI_API_TOKEN="test-token", OPENAI_API_KEY="test-key")
+    executor = FakeExecutor()
+    executor._workspace_root = initialization.workspace.root_dir
+    executor._press_release_path = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    service = _service_with_executor(executor, source_bundle, settings)
 
-    with pytest.raises(RuntimeError, match="maximum iterations"):
-        service._run(
-            case_input=_case_input(initialization.case_number),
-            workspace_root=initialization.workspace.root_dir,
-            executor=executor,
-        )
-
-    assert executor.reviser_calls == 1
-
-
-def test_run_service_traversal_history_in_output_no_revision(tmp_path: Path):
-    """Traversal history in OrchestratedRefinementOutput reflects completed nodes."""
-    initialization = _initialization(tmp_path)
-    source_bundle = _source_bundle(initialization)
-    executor = FakeExecutor(
-        critiques=[Critique(score=9, outcome=ReviewOutcome.approved)],
-    )
-    service = _service_with_executor(executor, source_bundle)
-
-    # Capture the orchestrated output by patching _publish_case to not run
-    # We test via the draft/review files written to disk instead
     result = service._run(
         case_input=_case_input(initialization.case_number),
         workspace_root=initialization.workspace.root_dir,
         executor=executor,
     )
     assert result.published is True
-    draft_path = initialization.workspace.root_dir / "draft.md"
+    draft_path = initialization.workspace.root_dir / "draft-final.md"
     assert draft_path.is_file()
     assert draft_path.stat().st_size > 0
-
-
-def test_run_service_traversal_history_updated_after_each_node(tmp_path: Path):
-    """Traversal history nodes are completed in order during the revision path."""
-    initialization = _initialization(tmp_path)
-    source_bundle = _source_bundle(initialization)
-    executor = FakeExecutor(
-        critiques=[
-            Critique(
-                score=7,
-                outcome=ReviewOutcome.needs_revision,
-                improvements=["More detail"],
-            ),
-            Critique(score=9, outcome=ReviewOutcome.approved),
-        ],
-    )
-    service = _service_with_executor(executor, source_bundle)
-
-    result = service._run(
-        case_input=_case_input(initialization.case_number),
-        workspace_root=initialization.workspace.root_dir,
-        executor=executor,
-    )
-
-    assert result.published is True
-    # Revision path: drafter(1) + reviewer(2) + critique_extractor(2) + reviser(1)
-    assert executor.drafter_calls == 1
-    assert executor.reviewer_calls == 2
-    assert executor.critique_extractor_calls == 2
-    assert executor.reviser_calls == 1
-

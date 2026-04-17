@@ -18,17 +18,10 @@ def main_callback() -> None:
 def run(case_number: str) -> None:
     """Run the CIAA workflow for a single CIAA Special Court case number."""
     result = RunService().start_run(case_number)
-    if result.published and result.case_id is not None:
-        typer.echo(
-            f"Published Jawafdehi case {result.case_id} for {result.case_number}"
-        )
-        raise typer.Exit(code=0)
-
     typer.echo(
-        "Workflow stopped before publication "
-        f"for {result.case_number} with outcome {result.final_outcome}"
+        f"Published Jawafdehi case {result.case_id} for {result.case_number}"
     )
-    raise typer.Exit(code=1)
+    raise typer.Exit(code=0)
 
 
 def main() -> None:

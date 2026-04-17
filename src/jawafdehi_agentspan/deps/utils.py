@@ -12,9 +12,7 @@ def ensure_within_directory(root: Path, path: Path, *, label: str) -> None:
     try:
         resolved_path.relative_to(resolved_root)
     except ValueError as err:
-        raise RuntimeError(
-            f"Path is outside the allowed {label} root: {path}"
-        ) from err
+        raise RuntimeError(f"Path is outside the allowed {label} root: {path}") from err
 
 
 def ensure_within_workspace(workspace_root: Path, path: Path) -> None:

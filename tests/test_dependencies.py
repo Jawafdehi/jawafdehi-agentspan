@@ -93,8 +93,24 @@ async def test_news_gatherer_skips_when_brave_key_missing(tmp_path: Path, monkey
     workspace = _workspace(tmp_path)
     case_details_path = workspace.data_dir / "case_details-081-CR-0123.md"
     case_details_path.write_text("# Case Details\n", encoding="utf-8")
-    raw_path = tmp_path / "global_store" / "cases" / "081-CR-0123" / "sources" / "raw" / "charge-sheet.pdf"
-    markdown_path = tmp_path / "global_store" / "cases" / "081-CR-0123" / "sources" / "markdown" / "charge-sheet.md"
+    raw_path = (
+        tmp_path
+        / "global_store"
+        / "cases"
+        / "081-CR-0123"
+        / "sources"
+        / "raw"
+        / "charge-sheet.pdf"
+    )
+    markdown_path = (
+        tmp_path
+        / "global_store"
+        / "cases"
+        / "081-CR-0123"
+        / "sources"
+        / "markdown"
+        / "charge-sheet.md"
+    )
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     raw_path.write_text("pdf", encoding="utf-8")
@@ -148,15 +164,47 @@ async def test_news_gatherer_uses_press_release_text_for_dynamic_queries(
     case_details_path = workspace.data_dir / "case_details-081-CR-0123.md"
     case_details_path.write_text("# Case Details\n", encoding="utf-8")
 
-    charge_raw = tmp_path / "global_store" / "cases" / "081-CR-0123" / "sources" / "raw" / "charge-sheet.pdf"
-    charge_md = tmp_path / "global_store" / "cases" / "081-CR-0123" / "sources" / "markdown" / "charge-sheet.md"
+    charge_raw = (
+        tmp_path
+        / "global_store"
+        / "cases"
+        / "081-CR-0123"
+        / "sources"
+        / "raw"
+        / "charge-sheet.pdf"
+    )
+    charge_md = (
+        tmp_path
+        / "global_store"
+        / "cases"
+        / "081-CR-0123"
+        / "sources"
+        / "markdown"
+        / "charge-sheet.md"
+    )
     charge_raw.parent.mkdir(parents=True, exist_ok=True)
     charge_md.parent.mkdir(parents=True, exist_ok=True)
     charge_raw.write_text("pdf", encoding="utf-8")
     charge_md.write_text("# Charge Sheet\n", encoding="utf-8")
 
-    press_raw = tmp_path / "global_store" / "cases" / "081-CR-0123" / "sources" / "raw" / "press-release.html"
-    press_md = tmp_path / "global_store" / "cases" / "081-CR-0123" / "sources" / "markdown" / "press-release.md"
+    press_raw = (
+        tmp_path
+        / "global_store"
+        / "cases"
+        / "081-CR-0123"
+        / "sources"
+        / "raw"
+        / "press-release.html"
+    )
+    press_md = (
+        tmp_path
+        / "global_store"
+        / "cases"
+        / "081-CR-0123"
+        / "sources"
+        / "markdown"
+        / "press-release.md"
+    )
     press_raw.parent.mkdir(parents=True, exist_ok=True)
     press_md.parent.mkdir(parents=True, exist_ok=True)
     press_raw.write_text("<html>press</html>", encoding="utf-8")

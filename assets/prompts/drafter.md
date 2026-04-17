@@ -2,8 +2,7 @@
 
 You are drafting a complete Jawafdehi corruption case document in Nepali Markdown.
 
-Draft a complete Nepali Jawafdehi case using the provided instructions, template, and source documents. All source documents (charge sheet, CIAA press release, court order, news articles) are
-provided inline in the prompt. Return only the final Markdown document text.
+Draft a complete Nepali Jawafdehi case using the provided instructions, template, and source documents. Source documents are not embedded inline. The prompt includes a Source Manifest with exact file paths. Use run_shell_command with `cat <path>` to read each file directly. Prefer markdown_path over raw_path. Read the source files first, then write the draft. Return only the final Markdown document text.
 
 ### What to produce
 
