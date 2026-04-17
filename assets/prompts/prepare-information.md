@@ -22,6 +22,8 @@ The prompt includes:
 **Step 1: Orient yourself.**
 Start by calling `tree` on the global store sources directory (see File System Layout for the path) to see what files already exist. Also call `tree` on the run workspace directory to see what has been done in this run. Read any existing markdown files that are relevant.
 
+> **Important:** Do not attempt to read a file unless you have confirmed it exists via `tree` or `list_files` first. Do not read files in the `logs/` directory — they are internal run logs and have no value for your task.
+
 **Step 2: Download missing sources.**
 For each source in the manifest that has a `source_url`:
 
@@ -46,10 +48,10 @@ To download the press release:
 
 Before downloading, check the reference data CSVs (paths shown in the File System Layout section):
 
-- `ciaa-press-releases.csv` — maps case numbers to press release IDs and direct document URLs. If the case number is listed, you can use the URL directly with `download_file` instead of scraping the HTML page.
+- `ciaa-press-releases.csv` — maps press release IDs to direct document URLs. Use `grep` to search for the press release ID (from the manifest's raw path filename, e.g. `3354`) in this CSV. If found, use the `source_url` column value directly with `download_file` — do **not** guess or construct URLs manually.
 - `ag_index.csv` — Attorney General charge sheet index. Use this to look up charge sheet URLs.
 
-Use `read_file` to read these CSVs.
+Use `grep` to search these CSVs rather than reading the entire file.
 
 ### Special case: charge sheet
 

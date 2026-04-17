@@ -76,9 +76,16 @@ class WorkspaceSourceGatherer:
 
     @staticmethod
     def _extract_primary_defendant(case_details: str) -> str | None:
-        match = re.search(r"(?m)^- \*\*(.+?)\*\*", case_details)
-        if match:
-            return match.group(1).strip()
+        # Find the Defendants section and extract the first bold name from it.
+        # We must skip the Plaintiffs section (which always contains "नेपाल सरकार").
+        defendants_match = re.search(
+            r"###\s*Defendants\s*\n(.*?)(?=\n###|\Z)", case_details, re.DOTALL
+        )
+        if defendants_match:
+            section = defendants_match.group(1)
+            name_match = re.search(r"\*\*(.+?)\*\*", section)
+            if name_match:
+                return name_match.group(1).strip()
         return None
 
     def _find_charge_sheet_row(

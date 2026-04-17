@@ -16,11 +16,11 @@ def ciaa_case_template_path() -> Path:
 
 
 def ciaa_ag_index_path() -> Path:
-    return ciaa_workflow_root() / "data" / "ag_index.csv"
+    return ciaa_assets_root() / "data" / "ag_index.csv"
 
 
 def ciaa_press_releases_path() -> Path:
-    return ciaa_workflow_root() / "data" / "ciaa-press-releases.csv"
+    return ciaa_assets_root() / "data" / "ciaa-press-releases.csv"
 
 
 def ciaa_assets_root() -> Path:

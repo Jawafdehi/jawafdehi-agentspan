@@ -163,7 +163,7 @@ def build_ciaa_orchestrator(settings: Settings, router) -> Agent:
         agents=[
             build_prepare_information_agent(settings),
             build_case_draft_agent(settings),
-            build_publish_agent(settings),
+            # build_publish_agent(settings),
         ],
         strategy="router",
         router=router,
