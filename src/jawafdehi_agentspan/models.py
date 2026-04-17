@@ -92,12 +92,25 @@ class RefinementIteration(BaseModel):
     revised: bool
 
 
+class TraversalNodeStatus(str, Enum):
+    completed = "completed"
+    pending = "pending"
+    conditional = "conditional"
+
+
+class TraversalNode(BaseModel):
+    node_name: str
+    status: TraversalNodeStatus
+    notes: str | None = None
+
+
 class OrchestratedRefinementOutput(BaseModel):
     draft_markdown: str
     review_markdown: str
     critique: Critique
     revision_used: bool = False
     initial_critique: Critique | None = None
+    traversal_history: list[TraversalNode] = Field(default_factory=list)
 
 
 class RefinementResult(BaseModel):

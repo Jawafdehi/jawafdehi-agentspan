@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -178,6 +179,24 @@ def gather_news_step(source_bundle_json: str) -> dict[str, Any]:
     bundle = SourceBundle.model_validate_json(source_bundle_json)
     updated = _run_async(get_dependencies().news_gatherer.gather_news(bundle))
     return json.loads(updated.model_dump_json())
+
+
+@tool(isolated=False)
+def run_shell_command(command: str, workspace_root: str) -> str:
+    """Run a shell command inside the workspace directory and return its output."""
+    root = _workspace_root(workspace_root)
+    result = subprocess.run(
+        command,
+        shell=True,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    output = result.stdout
+    if result.returncode != 0:
+        output += f"\n[stderr]: {result.stderr}"
+    return output
 
 
 @tool(isolated=False)

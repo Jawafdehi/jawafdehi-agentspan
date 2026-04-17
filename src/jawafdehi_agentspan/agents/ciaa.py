@@ -13,17 +13,14 @@ from jawafdehi_agentspan.models import (
 )
 from jawafdehi_agentspan.settings import Settings
 from jawafdehi_agentspan.tools import (
-    append_global_source_file,
     brave_search,
     convert_to_markdown,
     fetch_url,
     gather_news_step,
     gather_sources_step,
     initialize_casework_step,
-    list_global_source_files,
-    list_workspace_files,
     publish_case_step,
-    write_global_source_file,
+    run_shell_command,
 )
 
 _HERE = Path(__file__).parent
@@ -90,11 +87,10 @@ def build_draft_agent(settings: Settings) -> Agent:
             _load("drafter.md"),
             _load("case-template.md"),
             (
-                "Source documents are not embedded inline. Some live in the run "
-                "workspace and others live in the global source store. Use the "
-                "provided source manifest plus the default filesystem read tool to "
-                "inspect source files as needed, including specific lines when "
-                "helpful. Prefer markdown files over raw files."
+                "Source documents are not embedded inline. The prompt includes a "
+                "Source Manifest with exact file paths. Use run_shell_command with "
+                "`cat <path>` to read each file directly. Prefer markdown_path over "
+                "raw_path. Read the source files first, then write the draft."
             ),
         ]
     )
@@ -102,13 +98,8 @@ def build_draft_agent(settings: Settings) -> Agent:
         name="ciaa_drafter",
         model=settings.llm_model,
         instructions=instructions,
-        tools=[
-            list_workspace_files,
-            list_global_source_files,
-            write_global_source_file,
-            append_global_source_file,
-        ],
-        max_turns=2,
+        tools=[run_shell_command],
+        max_turns=10,
     )
 
 
@@ -117,11 +108,10 @@ def build_review_agent(settings: Settings) -> Agent:
         [
             _load("reviewer.md"),
             (
-                "Source documents are not embedded inline. Some live in the run "
-                "workspace and others live in the global source store. Use the "
-                "provided source manifest plus the default filesystem read tool to "
-                "inspect source files as needed, including specific lines when "
-                "helpful. Prefer markdown files over raw files."
+                "Source documents are not embedded inline. The prompt includes a "
+                "Source Manifest with exact file paths. Use run_shell_command with "
+                "`cat <path>` to read each file directly. Prefer markdown_path over "
+                "raw_path."
             ),
         ]
     )
@@ -129,11 +119,8 @@ def build_review_agent(settings: Settings) -> Agent:
         name="ciaa_reviewer",
         model=settings.llm_model,
         instructions=instructions,
-        tools=[
-            list_workspace_files,
-            list_global_source_files,
-        ],
-        max_turns=2,
+        tools=[run_shell_command],
+        max_turns=10,
     )
 
 
@@ -217,6 +204,8 @@ def build_refinement_orchestrator(settings: Settings) -> Agent:
             "complete in Python before this agent starts. "
             "Do not call initialize, source gathering, or news gathering "
             "specialists. "
+            "A traversal history section may be included in the prompt. Treat "
+            "it as workflow control state only, not as factual case evidence. "
             "Begin from the provided case context and source documents, then "
             "use only the drafting, review, critique extraction, and "
             "optional single revision specialists. "

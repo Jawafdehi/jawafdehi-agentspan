@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 from contextlib import AbstractContextManager
@@ -20,6 +21,8 @@ class AgentExecutor(Protocol):
 
 
 class AgentSpanExecutor(AbstractContextManager["AgentSpanExecutor"]):
+    logger = logging.getLogger(__name__)
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.runtime = AgentRuntime(
@@ -53,6 +56,19 @@ class AgentSpanExecutor(AbstractContextManager["AgentSpanExecutor"]):
         lowered = error.lower()
         return "cooling down" in lowered or "429" in lowered or "rate limit" in lowered
 
+    @staticmethod
+    def _preview_text(value: Any, *, limit: int = 800) -> str:
+        if isinstance(value, str):
+            text = value
+        else:
+            try:
+                text = json.dumps(value, ensure_ascii=False, default=str)
+            except TypeError:
+                text = repr(value)
+        if len(text) <= limit:
+            return text
+        return text[:limit] + "...<truncated>"
+
     def run(
         self, agent: Agent, prompt: str, output_type: type[T] | None = None
     ) -> T | Any:
@@ -78,12 +94,42 @@ class AgentSpanExecutor(AbstractContextManager["AgentSpanExecutor"]):
             time.sleep(delay)
 
         output = self._unwrap_output(result.output)
+        self.logger.debug(
+            "Agent '%s' raw output type=%s preview=%s",
+            agent.name,
+            type(result.output).__name__,
+            self._preview_text(result.output),
+        )
+        self.logger.debug(
+            "Agent '%s' unwrapped output type=%s preview=%s",
+            agent.name,
+            type(output).__name__,
+            self._preview_text(output),
+        )
         if output_type is None:
             return output
         if isinstance(output, output_type):
             return output
         if isinstance(output_type, type) and issubclass(output_type, BaseModel):
-            if isinstance(output, str):
-                return output_type.model_validate_json(output)
-            return output_type.model_validate(output)
+            expected_fields = list(output_type.model_fields)
+            actual_fields = list(output) if isinstance(output, dict) else None
+            self.logger.debug(
+                "Agent '%s' validating against model=%s expected_fields=%s actual_fields=%s",
+                agent.name,
+                output_type.__name__,
+                expected_fields,
+                actual_fields,
+            )
+            try:
+                if isinstance(output, str):
+                    return output_type.model_validate_json(output)
+                return output_type.model_validate(output)
+            except Exception:
+                self.logger.exception(
+                    "Agent '%s' failed model validation for %s with output preview=%s",
+                    agent.name,
+                    output_type.__name__,
+                    self._preview_text(output),
+                )
+                raise
         return output
