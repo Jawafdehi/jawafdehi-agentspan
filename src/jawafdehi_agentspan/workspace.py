@@ -32,13 +32,13 @@ def global_markdown_sources_dir(
 
 
 def global_news_raw_dir(case_number: str, settings: Settings | None = None) -> Path:
-    return global_case_dir(case_number, settings) / "sources" / "news" / "raw"
+    return global_case_dir(case_number, settings) / "news" / "raw"
 
 
 def global_news_markdown_dir(
     case_number: str, settings: Settings | None = None
 ) -> Path:
-    return global_case_dir(case_number, settings) / "sources" / "news" / "markdown"
+    return global_case_dir(case_number, settings) / "news" / "markdown"
 
 
 def ensure_case_store_dirs(case_number: str, settings: Settings | None = None) -> None:
@@ -55,18 +55,16 @@ def build_workspace_context(root_dir: Path) -> WorkspaceContext:
     root_dir = root_dir.resolve()
     logs_dir = root_dir / "logs"
     data_dir = root_dir / "data"
-    memory_file = root_dir / "MEMORY.md"
+    tmp_dir = root_dir / "tmp"
 
     logs_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
-    if not memory_file.exists():
-        memory_file.write_text("# MEMORY\n\n", encoding="utf-8")
+    tmp_dir.mkdir(parents=True, exist_ok=True)
 
     return WorkspaceContext(
         root_dir=root_dir,
         logs_dir=logs_dir,
         data_dir=data_dir,
-        memory_file=memory_file,
         sources=[],
     )
 
@@ -109,12 +107,7 @@ def build_case_initialization(
     workspace = build_workspace_context(workspace_root)
     ensure_case_store_dirs(case_number)
     case_details_path = workspace.data_dir / f"case_details-{case_number}.md"
-    content = asyncio.run(_fetch_case_details(adapter, case_number, case_details_path))
-    summary_path = workspace.logs_dir / "case-summary.md"
-    summary_path.write_text(
-        f"# Case Summary\n\n- Case number: {case_number}\n\n{content[:1200]}\n",
-        encoding="utf-8",
-    )
+    asyncio.run(_fetch_case_details(adapter, case_number, case_details_path))
     return CaseInitialization(
         case_number=case_number,
         workspace=workspace,

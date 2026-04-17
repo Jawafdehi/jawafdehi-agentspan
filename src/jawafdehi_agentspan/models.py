@@ -24,7 +24,6 @@ class WorkspaceContext(BaseModel):
     root_dir: Path
     logs_dir: Path
     data_dir: Path
-    memory_file: Path
 
 
 class CaseInitialization(BaseModel):

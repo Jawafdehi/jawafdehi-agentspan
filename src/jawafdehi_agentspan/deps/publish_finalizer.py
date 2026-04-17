@@ -79,8 +79,10 @@ class MCPPublishFinalizer:
     ) -> list[dict[str, str]]:
         uploaded: list[dict[str, str]] = []
         for source in publish_input.source_bundle.source_artifacts:
-            source_type = "OFFICIAL_GOVERNMENT"
             file_path = source.raw_path
+            if not file_path.is_file():
+                continue
+            source_type = "OFFICIAL_GOVERNMENT"
             if source.source_type == "charge_sheet":
                 source_type = "LEGAL_PROCEDURAL"
             elif source.source_type == "news":

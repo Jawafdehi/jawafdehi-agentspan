@@ -38,7 +38,7 @@ def build_default_dependencies() -> WorkflowDependencies:
     search_client = BraveSearchClient()
     return WorkflowDependencies(
         adapter=adapter,
-        source_gatherer=WorkspaceSourceGatherer(adapter=adapter, fetcher=fetcher),
+        source_gatherer=WorkspaceSourceGatherer(adapter=adapter),
         news_gatherer=SearchBackedNewsGatherer(
             adapter=adapter,
             search_client=search_client,

@@ -4,7 +4,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from jawafdehi_agentspan.agents import build_ciaa_orchestrator
+from jawafdehi_agentspan.agents import build_ciaa_orchestrator, build_file_system_prompt
 from jawafdehi_agentspan.assets import ciaa_workflow_root
 from jawafdehi_agentspan.dependencies import (
     build_default_dependencies,
@@ -87,6 +87,7 @@ class RunService:
             case_number=case_input.case_number,
             workspace_root=workspace_root,
             source_bundle=source_bundle,
+            settings=self.settings,
         )
         logger.debug("Orchestrator prompt for %s:\n%s", case_input.case_number, prompt)
 
@@ -109,15 +110,21 @@ class RunService:
         )
 
     def _make_router(self, *, case_number: str, workspace_root: Path):
-        press_release_path = global_raw_sources_dir(case_number, self.settings) / f"ciaa-press-release-{case_number}.pdf"
+        raw_sources_dir = global_raw_sources_dir(case_number, self.settings)
         draft_final_path = workspace_root / "draft-final.md"
 
+        def _press_release_exists() -> bool:
+            for ext in ("pdf", "doc", "docx", "html", "md"):
+                if any(raw_sources_dir.glob(f"ciaa-press-release-*.{ext}")):
+                    return True
+            return False
+
         def route(prompt: str) -> str:
-            if not press_release_path.is_file():
-                return "prepare-information"
+            if not _press_release_exists():
+                return "prepare_information"
             if not draft_final_path.is_file():
-                return "case-draft"
-            return "case-publisher"
+                return "case_draft"
+            return "case_publisher"
 
         return route
 
@@ -166,11 +173,15 @@ class RunService:
         case_number: str,
         workspace_root: Path,
         source_bundle: SourceBundle,
+        settings: Settings,
     ) -> str:
+        filesystem_prompt = build_file_system_prompt(
+            settings, case_number=case_number, workspace_root=workspace_root
+        )
         source_manifest = cls._format_source_manifest(source_bundle)
         return (
             f"Case number: {case_number}\n\n"
-            f"Workspace: {workspace_root}\n\n"
+            f"{filesystem_prompt}\n\n"
             "## Source Manifest\n\n"
             f"{source_manifest}"
         )

@@ -141,7 +141,7 @@ Internal working notes — not published. Include caseworker name and date draft
 
 ## Images
 
-Case-relevant images identified during news research (photos of accused, co-defendants, official press conference photos, property/crime-scene photos). Populated from `MEMORY.md ## Images` by the caseworker.
+Case-relevant images identified during news research (photos of accused, co-defendants, official press conference photos, property/crime-scene photos).
 
 - <!-- ![Caption](url) — context, source outlet -->
 

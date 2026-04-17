@@ -3,7 +3,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from jawafdehi_agentspan.cli import app
-from jawafdehi_agentspan.models import ReviewOutcome, WorkflowResult
+from jawafdehi_agentspan.models import WorkflowResult
 
 
 def test_cli_run_publishes_case(monkeypatch):
@@ -17,7 +17,6 @@ def test_cli_run_publishes_case(monkeypatch):
                 case_number=case_number,
                 published=True,
                 case_id=42,
-                final_outcome=ReviewOutcome.approved,
             )
 
     monkeypatch.setattr("jawafdehi_agentspan.cli.RunService", lambda: FakeRunService())

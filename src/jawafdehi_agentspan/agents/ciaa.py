@@ -4,6 +4,7 @@ from pathlib import Path
 
 from agentspan.agents import Agent, ConversationMemory
 
+from jawafdehi_agentspan.assets import ciaa_ag_index_path
 from jawafdehi_agentspan.models import (
     PublishedCaseResult,
     SourceBundle,
@@ -12,10 +13,15 @@ from jawafdehi_agentspan.settings import Settings
 from jawafdehi_agentspan.tools import (
     brave_search,
     convert_to_markdown,
+    download_file,
     fetch_url,
     gather_news_step,
+    grep,
+    list_files,
     publish_case_step,
-    run_shell_command,
+    read_file,
+    tree,
+    write_file,
 )
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[3] / "assets" / "prompts"
@@ -27,6 +33,18 @@ def _load(filename: str) -> str:
 
 def _memory() -> ConversationMemory:
     return ConversationMemory(max_messages=100)
+
+
+def build_file_system_prompt(settings: Settings, *, case_number: str, workspace_root: Path) -> str:
+    template = _load("filesystem.md")
+    data_dir = ciaa_ag_index_path().parent
+    return (
+        template
+        .replace("{global_store_root}", str(settings.global_store_root.resolve()))
+        .replace("{case_number}", case_number)
+        .replace("{workspace_root}", str(workspace_root.resolve()))
+        .replace("{data_dir}", str(data_dir.resolve()))
+    )
 
 
 def build_news_agent(settings: Settings) -> Agent:
@@ -46,10 +64,10 @@ def build_news_agent(settings: Settings) -> Agent:
 
 def build_draft_agent(settings: Settings) -> Agent:
     return Agent(
-        name="create-ciaa-case-draft",
+        name="create_ciaa_case_draft",
         model=settings.llm_model,
         instructions="\n\n".join([_load("drafter.md"), _load("case-template.md")]),
-        tools=[run_shell_command],
+        tools=[read_file, write_file],
         memory=_memory(),
         max_turns=10,
     )
@@ -57,10 +75,10 @@ def build_draft_agent(settings: Settings) -> Agent:
 
 def build_review_agent(settings: Settings) -> Agent:
     return Agent(
-        name="draft-reviewer",
+        name="draft_reviewer",
         model=settings.llm_model,
         instructions=_load("reviewer.md"),
-        tools=[run_shell_command],
+        tools=[read_file, write_file],
         memory=_memory(),
         max_turns=10,
     )
@@ -68,7 +86,7 @@ def build_review_agent(settings: Settings) -> Agent:
 
 def build_critique_extractor(settings: Settings) -> Agent:
     return Agent(
-        name="review-critique",
+        name="review_critique",
         model=settings.llm_model,
         instructions=_load("critique-extractor.md"),
         memory=_memory(),
@@ -78,7 +96,7 @@ def build_critique_extractor(settings: Settings) -> Agent:
 
 def build_revise_agent(settings: Settings) -> Agent:
     return Agent(
-        name="case-revisor",
+        name="case_revisor",
         model=settings.llm_model,
         instructions=_load("reviser.md"),
         memory=_memory(),
@@ -88,7 +106,7 @@ def build_revise_agent(settings: Settings) -> Agent:
 
 def build_publish_agent(settings: Settings) -> Agent:
     return Agent(
-        name="case-publisher",
+        name="case_publisher",
         model=settings.llm_model,
         instructions=_load("publisher.md"),
         tools=[publish_case_step],
@@ -101,7 +119,7 @@ def build_publish_agent(settings: Settings) -> Agent:
 
 def build_case_draft_router(settings: Settings) -> Agent:
     return Agent(
-        name="case-draft-router",
+        name="case_draft_router",
         model=settings.llm_model,
         instructions=_load("case-draft-router.md"),
         memory=_memory(),
@@ -110,7 +128,7 @@ def build_case_draft_router(settings: Settings) -> Agent:
 
 def build_case_draft_agent(settings: Settings) -> Agent:
     return Agent(
-        name="case-draft",
+        name="case_draft",
         model=settings.llm_model,
         instructions=_load("case-draft.md"),
         agents=[
@@ -128,12 +146,12 @@ def build_case_draft_agent(settings: Settings) -> Agent:
 
 def build_prepare_information_agent(settings: Settings) -> Agent:
     return Agent(
-        name="prepare-information",
+        name="prepare_information",
         model=settings.llm_model,
         instructions=_load("prepare-information.md"),
-        tools=[run_shell_command, fetch_url, convert_to_markdown],
+        tools=[read_file, write_file, list_files, tree, grep, fetch_url, download_file, convert_to_markdown],
         memory=_memory(),
-        max_turns=10,
+        max_turns=20,
     )
 
 

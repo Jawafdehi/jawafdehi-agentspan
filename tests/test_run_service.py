@@ -32,15 +32,12 @@ def _workspace(tmp_path: Path) -> WorkspaceContext:
     root = tmp_path / "run"
     logs_dir = root / "logs"
     data_dir = root / "data"
-    memory_file = root / "MEMORY.md"
     logs_dir.mkdir(parents=True)
     data_dir.mkdir(parents=True)
-    memory_file.write_text("# MEMORY\n", encoding="utf-8")
     return WorkspaceContext(
         root_dir=root,
         logs_dir=logs_dir,
         data_dir=data_dir,
-        memory_file=memory_file,
     )
 
 
@@ -205,22 +202,31 @@ def _case_input(case_number: str):
 # ---------------------------------------------------------------------------
 
 
+def _isolated_settings(tmp_path: Path) -> Settings:
+    return Settings(
+        JAWAFDEHI_API_TOKEN="t",
+        OPENAI_API_KEY="k",
+        GLOBAL_STORE_ROOT=str(tmp_path / "global_store"),
+        RUNS_ROOT=str(tmp_path / "runs"),
+    )
+
+
 def test_router_routes_to_prepare_information_when_no_press_release(tmp_path: Path):
     initialization = _initialization(tmp_path)
     workspace_root = initialization.workspace.root_dir
-    settings = Settings(JAWAFDEHI_API_TOKEN="t", OPENAI_API_KEY="k")
+    settings = _isolated_settings(tmp_path)
     service = RunService(settings=settings)
     router = service._make_router(
         case_number=initialization.case_number,
         workspace_root=workspace_root,
     )
-    assert router("anything") == "prepare-information"
+    assert router("anything") == "prepare_information"
 
 
 def test_router_routes_to_case_draft_when_press_release_exists(tmp_path: Path):
     initialization = _initialization(tmp_path)
     workspace_root = initialization.workspace.root_dir
-    settings = Settings(JAWAFDEHI_API_TOKEN="t", OPENAI_API_KEY="k")
+    settings = _isolated_settings(tmp_path)
     service = RunService(settings=settings)
 
     press_release = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
@@ -231,13 +237,13 @@ def test_router_routes_to_case_draft_when_press_release_exists(tmp_path: Path):
         case_number=initialization.case_number,
         workspace_root=workspace_root,
     )
-    assert router("anything") == "case-draft"
+    assert router("anything") == "case_draft"
 
 
 def test_router_routes_to_publisher_when_draft_final_exists(tmp_path: Path):
     initialization = _initialization(tmp_path)
     workspace_root = initialization.workspace.root_dir
-    settings = Settings(JAWAFDEHI_API_TOKEN="t", OPENAI_API_KEY="k")
+    settings = _isolated_settings(tmp_path)
     service = RunService(settings=settings)
 
     press_release = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
@@ -249,7 +255,7 @@ def test_router_routes_to_publisher_when_draft_final_exists(tmp_path: Path):
         case_number=initialization.case_number,
         workspace_root=workspace_root,
     )
-    assert router("anything") == "case-publisher"
+    assert router("anything") == "case_publisher"
 
 
 # ---------------------------------------------------------------------------
@@ -260,11 +266,13 @@ def test_router_routes_to_publisher_when_draft_final_exists(tmp_path: Path):
 def test_build_prompt_includes_case_number(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
+    settings = _isolated_settings(tmp_path)
 
     prompt = RunService._build_prompt(
         case_number=initialization.case_number,
         workspace_root=initialization.workspace.root_dir,
         source_bundle=source_bundle,
+        settings=settings,
     )
 
     assert "Case number: 081-CR-0046" in prompt
@@ -280,7 +288,7 @@ def test_build_prompt_includes_case_number(tmp_path: Path):
 def test_run_service_happy_path(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
-    settings = Settings(JAWAFDEHI_API_TOKEN="test-token", OPENAI_API_KEY="test-key")
+    settings = _isolated_settings(tmp_path)
     executor = FakeExecutor()
     executor._workspace_root = initialization.workspace.root_dir
     executor._press_release_path = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
@@ -301,9 +309,10 @@ def test_run_service_happy_path(tmp_path: Path):
 def test_run_service_fails_if_draft_final_not_written(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
+    settings = _isolated_settings(tmp_path)
     executor = FakeExecutor()
     # Do NOT set _workspace_root so draft-final.md is never written
-    service = _service_with_executor(executor, source_bundle)
+    service = _service_with_executor(executor, source_bundle, settings)
 
     with pytest.raises(RuntimeError, match="Expected output file was not created"):
         service._run(
@@ -316,7 +325,7 @@ def test_run_service_fails_if_draft_final_not_written(tmp_path: Path):
 def test_run_service_writes_draft_final(tmp_path: Path):
     initialization = _initialization(tmp_path)
     source_bundle = _source_bundle(initialization)
-    settings = Settings(JAWAFDEHI_API_TOKEN="test-token", OPENAI_API_KEY="test-key")
+    settings = _isolated_settings(tmp_path)
     executor = FakeExecutor()
     executor._workspace_root = initialization.workspace.root_dir
     executor._press_release_path = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"

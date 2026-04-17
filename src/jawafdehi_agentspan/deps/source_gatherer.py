@@ -9,7 +9,6 @@ from jawafdehi_agentspan.assets import (
     ciaa_ag_index_path,
     ciaa_press_releases_path,
 )
-from jawafdehi_agentspan.deps.fetcher import RemoteDocumentFetcher
 from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
 from jawafdehi_agentspan.models import (
     CaseInitialization,
@@ -28,10 +27,8 @@ class WorkspaceSourceGatherer:
         self,
         *,
         adapter: MCPToolAdapter,
-        fetcher: RemoteDocumentFetcher | None = None,
     ) -> None:
         self.adapter = adapter
-        self.fetcher = fetcher or RemoteDocumentFetcher()
 
     def _base_bundle(self, initialization: CaseInitialization) -> SourceBundle:
         ensure_case_store_dirs(initialization.case_number)
@@ -121,12 +118,11 @@ class WorkspaceSourceGatherer:
                 return row
         return None
 
-    async def _convert_to_markdown(self, raw_path: Path, markdown_path: Path) -> None:
-        await self.adapter.convert_to_markdown(
-            {"file_path": str(raw_path), "output_path": str(markdown_path)}
-        )
-
     async def gather_sources(self, initialization: CaseInitialization) -> SourceBundle:
+        """Look up source URLs from CSV indexes and return a bundle with expected paths.
+
+        Files are NOT downloaded here. The prepare-information agent downloads them.
+        """
         bundle = self._base_bundle(initialization)
 
         press_row = self._find_press_release_row(initialization)
@@ -144,8 +140,6 @@ class WorkspaceSourceGatherer:
                     global_markdown_sources_dir(initialization.case_number)
                     / f"ciaa-press-release-{press_id}.md"
                 )
-                await self.fetcher.download(press_url, raw_path)
-                await self._convert_to_markdown(raw_path, markdown_path)
                 artifact = SourceArtifact(
                     source_type="press_release",
                     title=(
@@ -170,16 +164,14 @@ class WorkspaceSourceGatherer:
             raise RuntimeError(
                 f"AG index row for {initialization.case_number} is missing pdf_url"
             )
-        raw_path = await self.fetcher.download_with_detected_extension(
-            pdf_url,
+        raw_path = (
             global_raw_sources_dir(initialization.case_number)
-            / f"charge-sheet-{initialization.case_number}",
+            / f"charge-sheet-{initialization.case_number}.pdf"
         )
         markdown_path = (
             global_markdown_sources_dir(initialization.case_number)
             / f"charge-sheet-{initialization.case_number}.md"
         )
-        await self._convert_to_markdown(raw_path, markdown_path)
         artifact = SourceArtifact(
             source_type="charge_sheet",
             title=(charge_row.get("title") or initialization.case_number).strip(),
