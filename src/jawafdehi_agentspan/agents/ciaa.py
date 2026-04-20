@@ -77,6 +77,30 @@ def build_draft_agent(settings: Settings) -> Agent:
     )
 
 
+def build_section_drafter_agent(settings: Settings, section_name: str) -> Agent:
+    return Agent(
+        name=f"draft_section_{section_name}",
+        model=settings.llm_model,
+        instructions="\n\n".join(
+            [_load("section-drafter.md"), f"Target section: {section_name}"]
+        ),
+        tools=[read_file, write_file],
+        memory=_memory(),
+        max_turns=4,
+    )
+
+
+def build_short_description_agent(settings: Settings) -> Agent:
+    return Agent(
+        name="draft_short_description",
+        model=settings.llm_model,
+        instructions=_load("short-description.md"),
+        tools=[read_file, write_file],
+        memory=_memory(),
+        max_turns=3,
+    )
+
+
 def build_review_agent(settings: Settings) -> Agent:
     return Agent(
         name="draft_reviewer",
