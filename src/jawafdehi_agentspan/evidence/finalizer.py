@@ -53,24 +53,19 @@ def compose_final_draft(
         errors=errors,
     )
 
-    ordered_section_names = [
-        "metadata",
-        "entities",
-        "description",
-        "key_allegations",
-        "timeline",
-        "evidence",
-        "tags",
-        "missing_details",
+    ordered = [
+        sections["metadata"],
+        sections["entities"],
+        sections["description"],
+        sections["key_allegations"],
+        sections["timeline"],
+        sections["evidence"],
+        sections["tags"],
+        sections["missing_details"],
     ]
-    ordered_sections: list[str] = []
-    for section in ordered_section_names:
-        heading = " ".join(part.capitalize() for part in section.split("_"))
-        body = sections.get(section, "").strip()
-        ordered_sections.append(f"## {heading}\n{body}".rstrip())
 
     return FinalizationResult(
-        draft_markdown="\n\n".join(ordered_sections).strip(),
+        draft_markdown="\n\n".join(ordered),
         short_description=sections["short_description"].strip(),
         validation=validation,
     )

@@ -2,16 +2,16 @@ from jawafdehi_agentspan.evidence.contracts import TraceabilityEntry
 from jawafdehi_agentspan.evidence.finalizer import compose_final_draft
 
 
-def test_compose_final_draft_validates_and_orders_sections() -> None:
+def test_compose_final_draft_requires_all_sections_and_traceability() -> None:
     sections = {
-        "metadata": "Case metadata",
-        "entities": "- **Entity**",
-        "description": "Case description",
-        "key_allegations": "- Allegation",
-        "timeline": "- 2026-01 घटना",
-        "evidence": "Evidence details",
-        "tags": "#tag",
-        "missing_details": "None",
+        "metadata": "## Case Metadata\n...",
+        "entities": "## Entities\n...",
+        "description": "## Description\n...",
+        "key_allegations": "## Key Allegations\n...",
+        "timeline": "## Timeline\n...",
+        "evidence": "## Evidence / Sources\n...",
+        "tags": "## Tags\n...",
+        "missing_details": "## Missing Details\nnot available from sources",
         "short_description": "सारांश",
     }
     traceability = [
