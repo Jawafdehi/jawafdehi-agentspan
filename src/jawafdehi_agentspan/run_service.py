@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
 from pathlib import Path
 
 from jawafdehi_agentspan.agents import build_ciaa_orchestrator, build_file_system_prompt
@@ -10,6 +12,7 @@ from jawafdehi_agentspan.dependencies import (
     build_default_dependencies,
     use_dependencies,
 )
+from jawafdehi_agentspan.evidence.contracts import TraceabilityEntry, ValidationReport
 from jawafdehi_agentspan.logging_utils import configure_run_logging
 from jawafdehi_agentspan.models import (
     CaseInitialization,
@@ -95,6 +98,7 @@ class RunService:
 
         draft_final_path = workspace_root / "draft-final.md"
         _validate_required_output(draft_final_path)
+        self._persist_payload_safe_artifacts(workspace_root, draft_final_path)
 
         published_case = self._publish_case(
             PublishInput(
@@ -149,6 +153,85 @@ class RunService:
         return _run_async(
             self.dependencies.publish_finalizer.publish_and_finalize(publish_input)
         )
+
+    @classmethod
+    def _extract_short_description_from_draft(cls, draft_markdown: str) -> str:
+        match = re.search(
+            r"(?ms)^##\s*Short Description\s*\n(.*?)(?=^##\s|\Z)",
+            draft_markdown,
+        )
+        if match:
+            return match.group(1).strip()
+
+        for line in draft_markdown.splitlines():
+            normalized = line.strip()
+            if normalized and not normalized.startswith("#"):
+                return normalized
+        return "No short description available."
+
+    @classmethod
+    def _load_traceability_entries(
+        cls, traceability_map_path: Path
+    ) -> list[TraceabilityEntry]:
+        if not traceability_map_path.is_file():
+            return []
+
+        payload = json.loads(traceability_map_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, list):
+            raise RuntimeError("traceability-map.json must contain a JSON list")
+        return [TraceabilityEntry.model_validate(entry) for entry in payload]
+
+    @classmethod
+    def _build_validation_report(
+        cls, traceability_entries: list[TraceabilityEntry]
+    ) -> ValidationReport:
+        unmapped_claims = [
+            entry.claim_text for entry in traceability_entries if not entry.source_refs
+        ]
+        errors = ["unmapped claims found"] if unmapped_claims else []
+        return ValidationReport(
+            is_valid=not errors,
+            missing_sections=[],
+            unmapped_claims=unmapped_claims,
+            errors=errors,
+        )
+
+    @classmethod
+    def _persist_payload_safe_artifacts(
+        cls, workspace_root: Path, draft_final_path: Path
+    ) -> None:
+        short_description_path = workspace_root / "short-description.txt"
+        traceability_map_path = workspace_root / "traceability-map.json"
+        validation_report_path = workspace_root / "validation-report.json"
+
+        if not short_description_path.is_file():
+            draft_markdown = draft_final_path.read_text(encoding="utf-8")
+            short_description = cls._extract_short_description_from_draft(
+                draft_markdown
+            )
+            short_description_path.write_text(short_description, encoding="utf-8")
+
+        traceability_entries = cls._load_traceability_entries(traceability_map_path)
+        if not traceability_map_path.is_file():
+            traceability_map_path.write_text(
+                json.dumps(
+                    [entry.model_dump() for entry in traceability_entries],
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+        if not validation_report_path.is_file():
+            report = cls._build_validation_report(traceability_entries)
+            validation_report_path.write_text(
+                json.dumps(report.model_dump(), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
+        _validate_required_output(short_description_path)
+        _validate_required_output(traceability_map_path)
+        _validate_required_output(validation_report_path)
 
     @classmethod
     def _format_source_manifest(cls, source_bundle: SourceBundle) -> str:
