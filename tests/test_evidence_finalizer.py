@@ -82,6 +82,36 @@ def test_compose_final_draft_unmapped_claim_returns_invalid_report() -> None:
     assert result.validation.is_valid is False
     assert result.validation.unmapped_claims == ["Unmapped assertion"]
     assert "unmapped claims found" in result.validation.errors
+    assert result.draft_markdown != ""
+    assert "## Description" in result.draft_markdown
+
+
+def test_compose_final_draft_blank_section_value_returns_invalid_report() -> None:
+    sections = {
+        "metadata": "## Case Metadata\n...",
+        "entities": "## Entities\n...",
+        "description": "## Description\n...",
+        "key_allegations": "## Key Allegations\n...",
+        "timeline": "   ",
+        "evidence": "## Evidence / Sources\n...",
+        "tags": "## Tags\n...",
+        "missing_details": "## Missing Details\nnot available from sources",
+        "short_description": "सारांश",
+    }
+    traceability = [
+        TraceabilityEntry(
+            claim_text="Case description",
+            section="description",
+            source_refs=[{"source_id": "s1", "chunk_id": "s1#0001"}],
+        )
+    ]
+
+    result = compose_final_draft(sections, traceability)
+
+    assert result.validation.is_valid is False
+    assert "timeline" in result.validation.missing_sections
+    assert "missing required sections" in result.validation.errors
+    assert result.draft_markdown == ""
 
 
 def test_compose_final_draft_reports_all_invalid_conditions() -> None:

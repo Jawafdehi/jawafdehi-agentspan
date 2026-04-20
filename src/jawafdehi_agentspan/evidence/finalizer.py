@@ -31,6 +31,14 @@ def compose_final_draft(
     sections: dict[str, str],
     traceability_entries: list[TraceabilityEntry],
 ) -> FinalizationResult:
+    """Compose the final markdown draft and a validation report.
+
+    Contract:
+    - `draft_markdown` is empty only when any required section is missing
+      (including blank/whitespace-only section values).
+    - If required sections are present, markdown is composed even when
+      traceability validation fails due to unmapped claims.
+    """
     missing_sections = [
         section
         for section in _REQUIRED_SECTIONS
@@ -53,6 +61,8 @@ def compose_final_draft(
         errors=errors,
     )
 
+    # Missing required sections is the only condition that suppresses
+    # markdown composition and forces an empty draft.
     if missing_sections:
         return FinalizationResult(
             draft_markdown="",
