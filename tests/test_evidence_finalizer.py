@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+from jawafdehi_agentspan.evidence.contracts import TraceabilityEntry
+from jawafdehi_agentspan.evidence.finalizer import compose_final_draft
+
+
+def test_compose_final_draft_requires_all_sections_and_traceability():
+    sections = {
+        "metadata": "## Case Metadata\n...",
+        "entities": "## Entities\n...",
+        "description": "## Description\n...",
+        "key_allegations": "## Key Allegations\n...",
+        "timeline": "## Timeline\n...",
+        "evidence": "## Evidence / Sources\n...",
+        "tags": "## Tags\n...",
+        "missing_details": "## Missing Details\nnot available from sources",
+        "short_description": "सारांश",
+    }
+    trace = [
+        TraceabilityEntry(
+            claim_text="रु 560000000 हानी",
+            section="description",
+            source_refs=[
+                {
+                    "source_id": "charge_sheet_081-CR-0046",
+                    "chunk_id": "charge_sheet_081-CR-0046#0001",
+                }
+            ],
+        )
+    ]
+
+    result = compose_final_draft(sections, trace)
+    assert result.validation.is_valid is True
+    assert "## Description" in result.draft_markdown
+    assert result.short_description == "सारांश"
