@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from jawafdehi_agentspan.agents import (
@@ -70,6 +71,8 @@ def test_build_short_description_agent_configuration() -> None:
 class _FakeExecutor:
     def __init__(self, workspace_root: Path) -> None:
         self.workspace_root = workspace_root
+        self.calls: list[str] = []
+        self._sections: list[str] = []
 
     def __enter__(self):
         return self
@@ -78,9 +81,54 @@ class _FakeExecutor:
         return None
 
     def run(self, agent, prompt: str, output_type=None):
-        (self.workspace_root / "draft-final.md").write_text(
-            "## Description\nPayload-safe draft\n", encoding="utf-8"
-        )
+        self.calls.append(agent.name)
+        if agent.name.startswith("draft_section_"):
+            section = agent.name.removeprefix("draft_section_")
+            self._sections.append(section)
+            draft_path = self.workspace_root / "draft-final.md"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            lines = [
+                (
+                    f"## {item.replace('_', ' ').title()}\n"
+                    f"Staged content {index + 1}\n"
+                )
+                for index, item in enumerate(self._sections)
+            ]
+            draft_path.write_text("\n".join(lines), encoding="utf-8")
+            (self.workspace_root / "traceability-map.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "claim_text": "Staged allegation",
+                            "section": "description",
+                            "source_refs": [
+                                {"source_id": "src-1", "chunk_id": "chunk-1"}
+                            ],
+                        }
+                    ],
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+        elif agent.name == "draft_short_description":
+            (self.workspace_root / "short-description.txt").write_text(
+                "Staged summary for 081-CR-0046.",
+                encoding="utf-8",
+            )
+            (self.workspace_root / "validation-report.json").write_text(
+                json.dumps(
+                    {
+                        "is_valid": True,
+                        "missing_sections": [],
+                        "unmapped_claims": [],
+                        "errors": [],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
         return None
 
 
@@ -123,10 +171,11 @@ def test_run_service_persists_payload_safe_artifacts(tmp_path: Path) -> None:
         charge_sheet_artifact=artifact,
     )
 
+    fake_executor = _FakeExecutor(workspace_root)
     service = RunService(
         settings=settings,
         dependencies=object(),
-        executor_factory=lambda: _FakeExecutor(workspace_root),
+        executor_factory=lambda: fake_executor,
     )
     service._initialize_casework = lambda *_args, **_kwargs: initialization
     service._gather_sources = lambda _initialization: source_bundle
@@ -135,11 +184,29 @@ def test_run_service_persists_payload_safe_artifacts(tmp_path: Path) -> None:
     result = service._run(
         case_input=type("CaseInput", (), {"case_number": "081-CR-0046"})(),
         workspace_root=workspace_root,
-        executor=_FakeExecutor(workspace_root),
+        executor=fake_executor,
     )
 
     assert result.case_id == 77
-    assert (workspace_root / "draft-final.md").is_file()
-    assert (workspace_root / "short-description.txt").is_file()
-    assert (workspace_root / "traceability-map.json").is_file()
-    assert (workspace_root / "validation-report.json").is_file()
+    assert fake_executor.calls[:2] == ["prepare_information", "draft_section_title"]
+    assert fake_executor.calls[-1] == "draft_short_description"
+
+    short_description = (workspace_root / "short-description.txt").read_text(
+        encoding="utf-8"
+    ).strip()
+    assert short_description
+    assert "Staged summary" in short_description
+
+    traceability_payload = json.loads(
+        (workspace_root / "traceability-map.json").read_text(encoding="utf-8")
+    )
+    assert isinstance(traceability_payload, list)
+    assert traceability_payload
+    assert {"claim_text", "section", "source_refs"} <= set(traceability_payload[0])
+
+    validation_payload = json.loads(
+        (workspace_root / "validation-report.json").read_text(encoding="utf-8")
+    )
+    assert {"is_valid", "missing_sections", "unmapped_claims", "errors"} <= set(
+        validation_payload
+    )

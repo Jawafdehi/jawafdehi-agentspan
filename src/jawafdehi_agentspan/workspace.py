@@ -108,9 +108,10 @@ def build_case_initialization(
     adapter: MCPToolAdapter,
     *,
     asset_root: Path,
+    settings: Settings | None = None,
 ) -> CaseInitialization:
     workspace = build_workspace_context(workspace_root)
-    ensure_case_store_dirs(case_number)
+    ensure_case_store_dirs(case_number, settings)
     case_details_path = workspace.data_dir / f"case_details-{case_number}.md"
     asyncio.run(_fetch_case_details(adapter, case_number, case_details_path))
     return CaseInitialization(

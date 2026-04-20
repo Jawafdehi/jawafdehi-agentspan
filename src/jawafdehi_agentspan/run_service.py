@@ -6,7 +6,13 @@ import logging
 import re
 from pathlib import Path
 
-from jawafdehi_agentspan.agents import build_ciaa_orchestrator, build_file_system_prompt
+from jawafdehi_agentspan.agents import (
+    build_ciaa_orchestrator,
+    build_file_system_prompt,
+    build_prepare_information_agent,
+    build_section_drafter_agent,
+    build_short_description_agent,
+)
 from jawafdehi_agentspan.assets import ciaa_workflow_root
 from jawafdehi_agentspan.dependencies import (
     build_default_dependencies,
@@ -30,6 +36,7 @@ from jawafdehi_agentspan.workspace import (
 )
 
 logger = logging.getLogger(__name__)
+_SECTION_DRAFT_SEQUENCE = ("title", "key_allegations", "timeline", "description")
 
 
 def _validate_required_output(path: Path) -> None:
@@ -52,7 +59,7 @@ class RunService:
         settings: Settings | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.dependencies = dependencies or build_default_dependencies()
+        self.dependencies = dependencies or build_default_dependencies(self.settings)
         self.executor_factory = executor_factory or (
             lambda: AgentSpanExecutor(self.settings)
         )
@@ -82,21 +89,36 @@ class RunService:
         )
         source_bundle = self._gather_sources(initialization)
 
-        router = self._make_router(
-            case_number=case_input.case_number,
-            workspace_root=workspace_root,
-        )
         prompt = self._build_prompt(
             case_number=case_input.case_number,
             workspace_root=workspace_root,
             source_bundle=source_bundle,
             settings=self.settings,
         )
-        logger.debug("Orchestrator prompt for %s:\n%s", case_input.case_number, prompt)
-
-        executor.run(build_ciaa_orchestrator(self.settings, router), prompt)
+        self._run_payload_safe_stages(
+            case_number=case_input.case_number,
+            workspace_root=workspace_root,
+            prompt=prompt,
+            executor=executor,
+        )
 
         draft_final_path = workspace_root / "draft-final.md"
+        if not draft_final_path.is_file() or draft_final_path.stat().st_size == 0:
+            router = self._make_router(
+                case_number=case_input.case_number,
+                workspace_root=workspace_root,
+            )
+            logger.debug(
+                "Falling back to orchestrator for %s because staged drafting did not"
+                " produce draft-final.md",
+                case_input.case_number,
+            )
+            logger.debug(
+                "Orchestrator prompt for %s:\n%s",
+                case_input.case_number,
+                prompt,
+            )
+            executor.run(build_ciaa_orchestrator(self.settings, router), prompt)
         _validate_required_output(draft_final_path)
         self._persist_payload_safe_artifacts(workspace_root, draft_final_path)
 
@@ -111,6 +133,42 @@ class RunService:
             case_number=case_input.case_number,
             published=True,
             case_id=published_case.case_id,
+        )
+
+    def _run_payload_safe_stages(
+        self,
+        *,
+        case_number: str,
+        workspace_root: Path,
+        prompt: str,
+        executor: AgentExecutor,
+    ) -> None:
+        logger.debug("Starting payload-safe staged flow for %s", case_number)
+        executor.run(build_prepare_information_agent(self.settings), prompt)
+
+        for section_name in _SECTION_DRAFT_SEQUENCE:
+            section_prompt = (
+                f"{prompt}\n\n"
+                f"Stage: draft section '{section_name}' into draft-final.md for"
+                " this case."
+            )
+            executor.run(
+                build_section_drafter_agent(self.settings, section_name),
+                section_prompt,
+            )
+
+        short_description_prompt = (
+            f"{prompt}\n\n"
+            "Stage: write short-description.txt using the current draft-final.md."
+        )
+        executor.run(
+            build_short_description_agent(self.settings),
+            short_description_prompt,
+        )
+        logger.debug(
+            "Completed payload-safe staged flow for %s in workspace %s",
+            case_number,
+            workspace_root,
         )
 
     def _make_router(self, *, case_number: str, workspace_root: Path):
@@ -142,6 +200,7 @@ class RunService:
             workspace_root,
             self.dependencies.adapter,
             asset_root=ciaa_workflow_root(),
+            settings=self.settings,
         )
 
     def _gather_sources(self, initialization: CaseInitialization) -> SourceBundle:

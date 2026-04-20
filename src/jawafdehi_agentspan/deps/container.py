@@ -7,7 +7,7 @@ from jawafdehi_agentspan.deps.news_gatherer import SearchBackedNewsGatherer
 from jawafdehi_agentspan.deps.publish_finalizer import MCPPublishFinalizer
 from jawafdehi_agentspan.deps.source_gatherer import WorkspaceSourceGatherer
 from jawafdehi_agentspan.mcp_adapters import MCPToolAdapter
-from jawafdehi_agentspan.settings import get_settings
+from jawafdehi_agentspan.settings import Settings, get_settings
 
 
 class WorkflowDependencies:
@@ -29,8 +29,10 @@ class WorkflowDependencies:
         self.search_client = search_client
 
 
-def build_default_dependencies() -> WorkflowDependencies:
-    settings = get_settings()
+def build_default_dependencies(
+    settings: Settings | None = None,
+) -> WorkflowDependencies:
+    settings = settings or get_settings()
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is required for live AgentSpan drafting.")
     adapter = MCPToolAdapter()
