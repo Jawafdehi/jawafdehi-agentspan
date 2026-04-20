@@ -174,6 +174,48 @@ def test_selector_fallback_claim_order_is_deterministic() -> None:
     ]
 
 
+def test_selector_prioritized_same_priority_ties_are_deterministic() -> None:
+    chunks = [
+        SourceChunk(
+            chunk_id="s#0001",
+            source_id="s",
+            text="मिति २०८२-०१-०२",
+            char_start=0,
+            char_end=20,
+            token_estimate=5,
+        ),
+        SourceChunk(
+            chunk_id="s#0002",
+            source_id="s",
+            text="मिति २०८२-०१-०१",
+            char_start=21,
+            char_end=40,
+            token_estimate=5,
+        ),
+    ]
+    claims = [
+        ClaimCandidate(
+            claim_id="c2",
+            claim_type="date",
+            value="2026-04-03",
+            confidence=0.9,
+            source_refs=[{"source_id": "s", "chunk_id": "s#0001"}],
+        ),
+        ClaimCandidate(
+            claim_id="c1",
+            claim_type="date",
+            value="2026-04-03",
+            confidence=0.9,
+            source_refs=[{"source_id": "s", "chunk_id": "s#0002"}],
+        ),
+    ]
+
+    selected = select_context_for_section("timeline", chunks, claims, max_chunks=5)
+
+    assert [claim.claim_id for claim in selected.claims] == ["c1", "c2"]
+    assert [chunk.chunk_id for chunk in selected.chunks] == ["s#0002", "s#0001"]
+
+
 def test_selector_ignores_missing_and_duplicate_chunk_refs() -> None:
     chunks = [
         SourceChunk(

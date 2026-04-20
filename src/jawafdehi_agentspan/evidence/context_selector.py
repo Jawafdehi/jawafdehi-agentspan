@@ -38,7 +38,11 @@ def select_context_for_section(
     priority_index = {claim_type: idx for idx, claim_type in enumerate(wanted)}
     prioritized_claims = sorted(
         (claim for claim in claims if claim.claim_type in priority_index),
-        key=lambda claim: priority_index[claim.claim_type],
+        key=lambda claim: (
+            priority_index[claim.claim_type],
+            claim.value,
+            claim.claim_id,
+        ),
     )
     fallback_claims = sorted(
         claims,
