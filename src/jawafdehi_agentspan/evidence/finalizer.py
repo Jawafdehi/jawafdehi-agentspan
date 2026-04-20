@@ -53,6 +53,13 @@ def compose_final_draft(
         errors=errors,
     )
 
+    if missing_sections:
+        return FinalizationResult(
+            draft_markdown="",
+            short_description=sections.get("short_description", "").strip(),
+            validation=validation,
+        )
+
     ordered = [
         sections["metadata"],
         sections["entities"],
