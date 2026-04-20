@@ -56,6 +56,6 @@ def test_evidence_contracts_round_trip() -> None:
     )
     report_rt = ValidationReport.model_validate(report.model_dump())
 
-    assert claim_rt.source_refs[0]["chunk_id"] == chunk_rt.chunk_id
-    assert trace_rt.section == "description"
-    assert report_rt.is_valid is True
+    assert claim.source_refs[0]["chunk_id"] == chunk.chunk_id
+    assert trace.section == "description"
+    assert report.is_valid is True
