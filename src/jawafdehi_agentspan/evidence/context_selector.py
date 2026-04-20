@@ -12,15 +12,15 @@ class SelectedContext:
 
 
 _SECTION_PRIORITY = {
-    "metadata": {"date", "amount", "legal_ref"},
-    "entities": {"accused_name", "related_party", "location"},
-    "description": {"amount", "legal_ref", "event", "other"},
-    "key_allegations": {"amount", "legal_ref", "event"},
-    "timeline": {"date", "event"},
-    "evidence": {"other"},
-    "tags": {"other"},
-    "missing_details": {"other"},
-    "short_description": {"amount", "event", "legal_ref"},
+    "metadata": ("date", "amount", "legal_ref"),
+    "entities": ("accused_name", "related_party", "location"),
+    "description": ("amount", "legal_ref", "event", "other"),
+    "key_allegations": ("amount", "legal_ref", "event"),
+    "timeline": ("date", "event"),
+    "evidence": ("other",),
+    "tags": ("other",),
+    "missing_details": ("other",),
+    "short_description": ("amount", "event", "legal_ref"),
 }
 
 
@@ -31,17 +31,27 @@ def select_context_for_section(
     *,
     max_chunks: int = 10,
 ) -> SelectedContext:
-    wanted = _SECTION_PRIORITY.get(section, {"other"})
-    prioritized_claims = [claim for claim in claims if claim.claim_type in wanted]
+    wanted = _SECTION_PRIORITY.get(section, ("other",))
+    priority_index = {claim_type: idx for idx, claim_type in enumerate(wanted)}
+    prioritized_claims = sorted(
+        (claim for claim in claims if claim.claim_type in priority_index),
+        key=lambda claim: priority_index[claim.claim_type],
+    )
     selected_claims = prioritized_claims or claims
 
-    claim_chunk_ids = {
-        ref["chunk_id"]
-        for claim in selected_claims
-        for ref in claim.source_refs
-        if "chunk_id" in ref
-    }
-    selected_chunks = [chunk for chunk in chunks if chunk.chunk_id in claim_chunk_ids]
+    chunk_by_id = {chunk.chunk_id: chunk for chunk in chunks}
+    selected_chunks: list[SourceChunk] = []
+    seen_chunk_ids: set[str] = set()
+    for claim in selected_claims:
+        for ref in claim.source_refs:
+            chunk_id = ref.get("chunk_id")
+            if not chunk_id or chunk_id in seen_chunk_ids:
+                continue
+            chunk = chunk_by_id.get(chunk_id)
+            if chunk is None:
+                continue
+            selected_chunks.append(chunk)
+            seen_chunk_ids.add(chunk_id)
     if not selected_chunks:
         selected_chunks = chunks[:max_chunks]
 
