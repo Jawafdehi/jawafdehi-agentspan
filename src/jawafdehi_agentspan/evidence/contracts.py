@@ -15,16 +15,23 @@ class SourceRegistryItem(BaseModel):
         "court_order",
         "bolpatra",
     ]
+    url: str | None = None
+    raw_path: str
+    markdown_path: str
     status: Literal["existing", "downloaded", "converted", "missing"]
 
 
 class SourceChunk(BaseModel):
     chunk_id: str
     source_id: str
-    content: str
+    text: str
+    char_start: int
+    char_end: int
+    token_estimate: int
 
 
 class ClaimCandidate(BaseModel):
+    claim_id: str
     claim_type: Literal[
         "accused_name",
         "related_party",
@@ -35,11 +42,13 @@ class ClaimCandidate(BaseModel):
         "location",
         "other",
     ]
+    value: str
     confidence: float = Field(ge=0.0, le=1.0)
-    source_refs: list[dict[str, str]] = Field(default_factory=list)
+    source_refs: list[dict[str, str]]
 
 
 class TraceabilityEntry(BaseModel):
+    claim_text: str
     section: Literal[
         "metadata",
         "entities",
@@ -51,10 +60,11 @@ class TraceabilityEntry(BaseModel):
         "missing_details",
         "short_description",
     ]
+    source_refs: list[dict[str, str]]
 
 
 class ValidationReport(BaseModel):
     is_valid: bool
-    missing_sections: list[str] = Field(default_factory=list)
-    unmapped_claims: list[str] = Field(default_factory=list)
-    errors: list[str] = Field(default_factory=list)
+    missing_sections: list[str]
+    unmapped_claims: list[str]
+    errors: list[str]
