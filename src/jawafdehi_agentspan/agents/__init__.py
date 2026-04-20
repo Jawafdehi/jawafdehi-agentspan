@@ -10,6 +10,8 @@ from jawafdehi_agentspan.agents.ciaa import (
     build_publish_agent,
     build_review_agent,
     build_revise_agent,
+    build_section_drafter_agent,
+    build_short_description_agent,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "build_publish_agent",
     "build_review_agent",
     "build_revise_agent",
+    "build_section_drafter_agent",
+    "build_short_description_agent",
 ]
