@@ -18,9 +18,7 @@ def main_callback() -> None:
 def run(case_number: str) -> None:
     """Run the CIAA workflow for a single CIAA Special Court case number."""
     result = RunService().start_run(case_number)
-    typer.echo(
-        f"Published Jawafdehi case {result.case_id} for {result.case_number}"
-    )
+    typer.echo(f"Published Jawafdehi case {result.case_id} for {result.case_number}")
     raise typer.Exit(code=0)
 
 

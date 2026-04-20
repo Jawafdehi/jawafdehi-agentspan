@@ -23,7 +23,9 @@ _DRAFT_MARKDOWN = (
     "## Short Description\nu091bu094bu091fu094b u0935u093fu0935u0930u0923\n\n"
     "## Key Allegations\n- u0906u0930u094bu092a u0967\n- u0906u0930u094bu092a u0968\n\n"
     "## Timeline\n- 2082-01-01: u0926u0930u094du0924u093e\n\n"
-    "## Description\n" + ("u0935u093fu0938u094du0924u0943u0924 u0935u093fu0935u0930u0923u0964" * 60) + "\n"
+    "## Description\n"
+    + ("u0935u093fu0938u094du0924u0943u0924 u0935u093fu0935u0930u0923u0964" * 60)
+    + "\n"
 )
 _REVIEW_MARKDOWN = "## Overall Review\n\nInitial review result\n"
 
@@ -229,7 +231,10 @@ def test_router_routes_to_case_draft_when_press_release_exists(tmp_path: Path):
     settings = _isolated_settings(tmp_path)
     service = RunService(settings=settings)
 
-    press_release = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    press_release = (
+        global_raw_sources_dir(initialization.case_number, settings)
+        / f"ciaa-press-release-{initialization.case_number}.pdf"
+    )
     press_release.parent.mkdir(parents=True, exist_ok=True)
     press_release.write_text("pdf", encoding="utf-8")
 
@@ -246,7 +251,10 @@ def test_router_routes_to_publisher_when_draft_final_exists(tmp_path: Path):
     settings = _isolated_settings(tmp_path)
     service = RunService(settings=settings)
 
-    press_release = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    press_release = (
+        global_raw_sources_dir(initialization.case_number, settings)
+        / f"ciaa-press-release-{initialization.case_number}.pdf"
+    )
     press_release.parent.mkdir(parents=True, exist_ok=True)
     press_release.write_text("pdf", encoding="utf-8")
     (workspace_root / "draft-final.md").write_text("draft", encoding="utf-8")
@@ -291,7 +299,10 @@ def test_run_service_happy_path(tmp_path: Path):
     settings = _isolated_settings(tmp_path)
     executor = FakeExecutor()
     executor._workspace_root = initialization.workspace.root_dir
-    executor._press_release_path = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    executor._press_release_path = (
+        global_raw_sources_dir(initialization.case_number, settings)
+        / f"ciaa-press-release-{initialization.case_number}.pdf"
+    )
     service = _service_with_executor(executor, source_bundle, settings)
 
     result = service._run(
@@ -328,7 +339,10 @@ def test_run_service_writes_draft_final(tmp_path: Path):
     settings = _isolated_settings(tmp_path)
     executor = FakeExecutor()
     executor._workspace_root = initialization.workspace.root_dir
-    executor._press_release_path = global_raw_sources_dir(initialization.case_number, settings) / f"ciaa-press-release-{initialization.case_number}.pdf"
+    executor._press_release_path = (
+        global_raw_sources_dir(initialization.case_number, settings)
+        / f"ciaa-press-release-{initialization.case_number}.pdf"
+    )
     service = _service_with_executor(executor, source_bundle, settings)
 
     result = service._run(

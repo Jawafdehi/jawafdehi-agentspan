@@ -69,11 +69,14 @@ def build_workspace_context(root_dir: Path) -> WorkspaceContext:
     )
 
 
-def create_workspace(case_number: str) -> WorkspaceContext:
-    runs_dir = runs_root()
-    runs_dir.mkdir(parents=True, exist_ok=True)
+def create_workspace(
+    case_number: str, settings: Settings | None = None
+) -> WorkspaceContext:
+    case_dir = global_case_dir(case_number, settings)
+    tmp_dir = case_dir / "tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
-    root_dir = runs_dir / f"jawaf-{timestamp}-{case_number}"
+    root_dir = tmp_dir / f"run-{timestamp}"
     root_dir.mkdir(parents=False, exist_ok=False)
     return build_workspace_context(root_dir)
 
@@ -93,7 +96,9 @@ async def _fetch_case_details(
     if "429" in msg or "too many requests" in msg or "rate limit" in msg:
         raise RuntimeError(f"NGM API rate-limited for {case_number}: {result}")
     if not output_path.is_file():
-        raise RuntimeError(f"NGM tool failed to write case details for {case_number}: {result}")
+        raise RuntimeError(
+            f"NGM tool failed to write case details for {case_number}: {result}"
+        )
     return output_path.read_text(encoding="utf-8")
 
 

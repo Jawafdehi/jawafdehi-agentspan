@@ -5,4 +5,5 @@ agent-runtime.db*
 runs/
 
 .env
-/global_store/
+/global_store/cases/
+/files/cases/

@@ -114,7 +114,8 @@ class AgentSpanExecutor(AbstractContextManager["AgentSpanExecutor"]):
             expected_fields = list(output_type.model_fields)
             actual_fields = list(output) if isinstance(output, dict) else None
             self.logger.debug(
-                "Agent '%s' validating against model=%s expected_fields=%s actual_fields=%s",
+                "Agent '%s' validating against model=%s "
+                "expected_fields=%s actual_fields=%s",
                 agent.name,
                 output_type.__name__,
                 expected_fields,

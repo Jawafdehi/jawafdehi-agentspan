@@ -34,11 +34,11 @@ class Settings(BaseSettings):
         default=None, alias="AGENTSPAN_AUTH_SECRET"
     )
     global_store_root: Path = Field(
-        default_factory=lambda: Path.cwd() / "global_store",
+        default_factory=lambda: Path.cwd() / "files",
         alias="GLOBAL_STORE_ROOT",
     )
     runs_root: Path = Field(
-        default_factory=lambda: Path.cwd() / "runs",
+        default_factory=lambda: Path.cwd() / "files" / "runs",
         alias="RUNS_ROOT",
     )
 

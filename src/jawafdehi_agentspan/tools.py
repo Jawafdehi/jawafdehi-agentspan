@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,8 @@ from jawafdehi_agentspan.assets import ciaa_workflow_root
 from jawafdehi_agentspan.dependencies import get_dependencies
 from jawafdehi_agentspan.models import CaseInitialization, PublishInput, SourceBundle
 from jawafdehi_agentspan.settings import get_settings
-from jawafdehi_agentspan.workspace import build_case_initialization
+
+logger = logging.getLogger(__name__)
 
 
 def _run_async(awaitable):
@@ -46,9 +48,44 @@ def _validate_readable_path(path: str) -> Path:
     return _validate_path(path)
 
 
+def _validate_case_directory(path: str) -> Path:
+    resolved = _validate_path(path)
+    settings = get_settings()
+    cases_root = (settings.global_store_root.resolve() / "cases").resolve()
+
+    try:
+        relative = resolved.relative_to(cases_root)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Directory must be inside a case directory under {cases_root}: {path}"
+        ) from exc
+
+    if len(relative.parts) < 2:
+        raise RuntimeError(
+            f"Directory must be inside files/cases/{{case-number}}/...: {path}"
+        )
+
+    return resolved
+
+
+_READ_FILE_MAX_BYTES = 100_000  # 100 KB — prevents 413 from huge log files
+
+
 @tool(isolated=False)
 def read_file(file_path: str) -> str:
     path = _validate_readable_path(file_path)
+    if path.suffix == ".log":
+        raise RuntimeError(
+            f"Reading .log files is not allowed: {path}. "
+            "Log files are large debug artifacts — ignore them."
+        )
+    size = path.stat().st_size
+    if size > _READ_FILE_MAX_BYTES:
+        raise RuntimeError(
+            f"File too large to read ({size:,} bytes > "
+            f"{_READ_FILE_MAX_BYTES:,} limit): {path}. "
+            "Use grepNew to search for specific content instead."
+        )
     return path.read_text(encoding="utf-8")
 
 
@@ -70,8 +107,25 @@ def append_file(file_path: str, content: str) -> str:
 
 
 @tool(isolated=False)
+def mkdir(directory_path: str) -> str:
+    path = _validate_case_directory(directory_path)
+    already_exists = path.is_dir()
+    path.mkdir(parents=True, exist_ok=True)
+
+    if already_exists:
+        warning = f"Warning: directory already exists: {path}"
+        logger.warning(warning)
+        return warning
+
+    return f"Created directory: {path}"
+
+
+@tool(isolated=False)
 def list_files(directory: str, pattern: str = "**/*") -> list[str]:
-    """List files and directories matching pattern. Files show line count; directories end with /."""
+    """List files and directories matching pattern.
+
+    Files show line count; directories end with /.
+    """
     root = _validate_readable_path(directory)
     results = []
     for p in sorted(root.glob(pattern)):
@@ -87,8 +141,11 @@ def list_files(directory: str, pattern: str = "**/*") -> list[str]:
 
 
 @tool(isolated=False)
-def grep(pattern: str, path: str, extra_args: str = "") -> str:
-    """Run system grep on path (file or directory). path must be within allowed roots."""
+def grepNew(pattern: str, path: str, extra_args: str = "") -> str:
+    """Run system grep on path.
+
+    The path may be a file or directory, and it must be within allowed roots.
+    """
     resolved = _validate_readable_path(path)
     cmd = ["grep", "-rn", pattern, str(resolved)]
     if extra_args:
@@ -173,18 +230,6 @@ def convert_to_markdown(file_path: str, output_path: str) -> str:
             {"file_path": str(raw_path), "output_path": str(md_path)}
         )
     )
-
-
-@tool(isolated=False)
-def initialize_casework_step(case_number: str, workspace_root: str) -> dict[str, Any]:
-    root = Path(workspace_root).resolve()
-    initialization = build_case_initialization(
-        case_number,
-        root,
-        get_dependencies().adapter,
-        asset_root=ciaa_workflow_root(),
-    )
-    return json.loads(initialization.model_dump_json())
 
 
 @tool(isolated=False)

@@ -4,7 +4,6 @@ from pathlib import Path
 
 from agentspan.agents import Agent, ConversationMemory
 
-from jawafdehi_agentspan.assets import ciaa_ag_index_path
 from jawafdehi_agentspan.models import (
     PublishedCaseResult,
     SourceBundle,
@@ -16,8 +15,9 @@ from jawafdehi_agentspan.tools import (
     download_file,
     fetch_url,
     gather_news_step,
-    grep,
+    grepNew,
     list_files,
+    mkdir,
     publish_case_step,
     read_file,
     tree,
@@ -35,15 +35,19 @@ def _memory() -> ConversationMemory:
     return ConversationMemory(max_messages=100)
 
 
-def build_file_system_prompt(settings: Settings, *, case_number: str, workspace_root: Path) -> str:
+def build_file_system_prompt(
+    settings: Settings, *, case_number: str, workspace_root: Path
+) -> str:
     template = _load("filesystem.md")
-    data_dir = ciaa_ag_index_path().parent
+    data_dir = (settings.global_store_root.resolve() / "data").resolve()
+
     return (
-        template
-        .replace("{global_store_root}", str(settings.global_store_root.resolve()))
+        template.replace(
+            "{global_store_root}", str(settings.global_store_root.resolve())
+        )
         .replace("{case_number}", case_number)
         .replace("{workspace_root}", str(workspace_root.resolve()))
-        .replace("{data_dir}", str(data_dir.resolve()))
+        .replace("{data_dir}", str(data_dir))
     )
 
 
@@ -66,7 +70,7 @@ def build_draft_agent(settings: Settings) -> Agent:
     return Agent(
         name="create_ciaa_case_draft",
         model=settings.llm_model,
-        instructions="\n\n".join([_load("drafter.md"), _load("case-template.md")]),
+        instructions=_load("drafter.md"),
         tools=[read_file, write_file],
         memory=_memory(),
         max_turns=10,
@@ -148,10 +152,22 @@ def build_prepare_information_agent(settings: Settings) -> Agent:
     return Agent(
         name="prepare_information",
         model=settings.llm_model,
-        instructions=_load("prepare-information.md"),
-        tools=[read_file, write_file, list_files, tree, grep, fetch_url, download_file, convert_to_markdown],
+        instructions="\n\n".join(
+            [_load("prepare-information.md"), _load("filesystem.md")]
+        ),
+        tools=[
+            read_file,
+            write_file,
+            list_files,
+            mkdir,
+            tree,
+            grepNew,
+            fetch_url,
+            download_file,
+            convert_to_markdown,
+        ],
         memory=_memory(),
-        max_turns=20,
+        max_turns=40,
     )
 
 
@@ -169,3 +185,27 @@ def build_ciaa_orchestrator(settings: Settings, router) -> Agent:
         router=router,
         max_turns=6,
     )
+
+
+if __name__ == "__main__":
+    from agentspan.agents import AgentRuntime
+
+    from jawafdehi_agentspan.logging_utils import configure_run_logging
+    from jawafdehi_agentspan.settings import get_settings
+    from jawafdehi_agentspan.workspace import create_workspace
+
+    settings = get_settings()
+    case_number = "081-CR-0122"
+
+    agent = build_prepare_information_agent(settings)
+    workspace = create_workspace(case_number, settings)
+    configure_run_logging(workspace.logs_dir, case_number)
+
+    with AgentRuntime() as runtime:
+        prompt = f"""Let's work on the CIAA case.
+        jawafdehi_file_store_root: {settings.global_store_root.resolve()}
+        workspace_root: {workspace.root_dir}
+        Case number: {case_number}
+        """
+
+        runtime.run(agent, prompt)
