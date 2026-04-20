@@ -31,13 +31,20 @@ def select_context_for_section(
     *,
     max_chunks: int = 10,
 ) -> SelectedContext:
+    if max_chunks <= 0:
+        raise ValueError("max_chunks must be positive")
+
     wanted = _SECTION_PRIORITY.get(section, ("other",))
     priority_index = {claim_type: idx for idx, claim_type in enumerate(wanted)}
     prioritized_claims = sorted(
         (claim for claim in claims if claim.claim_type in priority_index),
         key=lambda claim: priority_index[claim.claim_type],
     )
-    selected_claims = prioritized_claims or claims
+    fallback_claims = sorted(
+        claims,
+        key=lambda claim: (claim.claim_type, claim.value, claim.claim_id),
+    )
+    selected_claims = prioritized_claims or fallback_claims
 
     chunk_by_id = {chunk.chunk_id: chunk for chunk in chunks}
     selected_chunks: list[SourceChunk] = []
