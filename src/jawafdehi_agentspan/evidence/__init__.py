@@ -9,6 +9,10 @@ from jawafdehi_agentspan.evidence.contracts import (
     TraceabilityEntry,
     ValidationReport,
 )
+from jawafdehi_agentspan.evidence.finalizer import (
+    FinalizationResult,
+    compose_final_draft,
+)
 
 __all__ = [
     "SourceRegistryItem",
@@ -18,4 +22,6 @@ __all__ = [
     "ValidationReport",
     "SelectedContext",
     "select_context_for_section",
+    "FinalizationResult",
+    "compose_final_draft",
 ]
