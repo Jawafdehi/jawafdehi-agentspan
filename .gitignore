@@ -7,3 +7,4 @@ runs/
 .env
 /global_store/cases/
 /files/cases/
+.worktrees/
