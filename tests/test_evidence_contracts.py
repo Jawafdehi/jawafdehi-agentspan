@@ -46,7 +46,7 @@ def test_evidence_contracts_round_trip() -> None:
             {"source_id": registry_rt.source_id, "chunk_id": chunk_rt.chunk_id}
         ],
     )
-    trace_rt = TraceabilityEntry.model_validate(trace.model_dump())
+    TraceabilityEntry.model_validate(trace.model_dump())
 
     report = ValidationReport(
         is_valid=True,
@@ -54,7 +54,7 @@ def test_evidence_contracts_round_trip() -> None:
         unmapped_claims=[],
         errors=[],
     )
-    report_rt = ValidationReport.model_validate(report.model_dump())
+    ValidationReport.model_validate(report.model_dump())
 
     assert claim.source_refs[0]["chunk_id"] == chunk.chunk_id
     assert trace.section == "description"
