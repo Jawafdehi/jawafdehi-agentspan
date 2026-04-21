@@ -131,6 +131,14 @@ class FakeExecutor:
         return None
 
 
+class FailingStagedExecutor(FakeExecutor):
+    def run(self, agent, prompt: str, output_type=None):
+        if agent.name == "prepare_information":
+            self.calls.append(agent.name)
+            raise RuntimeError("staged flow failed")
+        return super().run(agent, prompt, output_type)
+
+
 class FakeAdapter:
     async def call_text(self, tool_name: str, arguments: dict) -> str:
         if tool_name == "ngm_extract_case_data":
@@ -354,3 +362,29 @@ def test_run_service_writes_draft_final(tmp_path: Path):
     draft_path = initialization.workspace.root_dir / "draft-final.md"
     assert draft_path.is_file()
     assert draft_path.stat().st_size > 0
+
+
+def test_run_service_falls_back_to_orchestrator_when_staged_flow_raises(
+    tmp_path: Path,
+):
+    initialization = _initialization(tmp_path)
+    source_bundle = _source_bundle(initialization)
+    settings = _isolated_settings(tmp_path)
+    executor = FailingStagedExecutor()
+    executor._workspace_root = initialization.workspace.root_dir
+    executor._press_release_path = (
+        global_raw_sources_dir(initialization.case_number, settings)
+        / f"ciaa-press-release-{initialization.case_number}.pdf"
+    )
+    service = _service_with_executor(executor, source_bundle, settings)
+
+    result = service._run(
+        case_input=_case_input(initialization.case_number),
+        workspace_root=initialization.workspace.root_dir,
+        executor=executor,
+    )
+
+    assert result.published is True
+    assert result.case_id == 7
+    assert "prepare_information" in executor.calls
+    assert "orchestrator" in executor.calls

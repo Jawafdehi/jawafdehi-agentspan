@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from jawafdehi_agentspan.agents import (
     build_prepare_information_agent,
     build_section_drafter_agent,
@@ -69,6 +72,8 @@ def test_build_short_description_agent_configuration() -> None:
 
 
 class _FakeExecutor:
+    STAGED_SHORT_DESCRIPTION = "staged-short-description-from-agent"
+
     def __init__(self, workspace_root: Path) -> None:
         self.workspace_root = workspace_root
         self.calls: list[str] = []
@@ -95,6 +100,13 @@ class _FakeExecutor:
                 for index, item in enumerate(self._sections)
             ]
             draft_path.write_text("\n".join(lines), encoding="utf-8")
+        if agent.name == "draft_short_description":
+            short_description_path = self.workspace_root / "short-description.txt"
+            short_description_path.parent.mkdir(parents=True, exist_ok=True)
+            short_description_path.write_text(
+                self.STAGED_SHORT_DESCRIPTION,
+                encoding="utf-8",
+            )
         return None
 
 
@@ -171,7 +183,8 @@ def test_run_service_persists_payload_safe_artifacts(tmp_path: Path) -> None:
         encoding="utf-8"
     ).strip()
     assert short_description
-    assert short_description == "Staged content 1"
+    assert short_description == _FakeExecutor.STAGED_SHORT_DESCRIPTION
+    assert "orchestrator" not in fake_executor.calls
 
     traceability_payload = json.loads(
         (workspace_root / "traceability-map.json").read_text(encoding="utf-8")
@@ -188,3 +201,19 @@ def test_run_service_persists_payload_safe_artifacts(tmp_path: Path) -> None:
         "unmapped_claims",
         "errors",
     } <= set(validation_payload)
+
+
+def test_persist_payload_safe_artifacts_rejects_invalid_existing_validation_report(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    draft_final_path = workspace_root / "draft-final.md"
+    draft_final_path.write_text("## Title\nExample\n", encoding="utf-8")
+    (workspace_root / "validation-report.json").write_text(
+        json.dumps({"is_valid": True}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError):
+        RunService._persist_payload_safe_artifacts(workspace_root, draft_final_path)

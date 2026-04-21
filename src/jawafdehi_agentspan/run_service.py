@@ -95,15 +95,27 @@ class RunService:
             source_bundle=source_bundle,
             settings=self.settings,
         )
-        self._run_payload_safe_stages(
-            case_number=case_input.case_number,
-            workspace_root=workspace_root,
-            prompt=prompt,
-            executor=executor,
-        )
+        staged_flow_failed = False
+        try:
+            self._run_payload_safe_stages(
+                case_number=case_input.case_number,
+                workspace_root=workspace_root,
+                prompt=prompt,
+                executor=executor,
+            )
+        except Exception:
+            staged_flow_failed = True
+            logger.exception(
+                "Payload-safe staged flow failed for %s; falling back to orchestrator.",
+                case_input.case_number,
+            )
 
         draft_final_path = workspace_root / "draft-final.md"
-        if not draft_final_path.is_file() or draft_final_path.stat().st_size == 0:
+        if (
+            staged_flow_failed
+            or not draft_final_path.is_file()
+            or draft_final_path.stat().st_size == 0
+        ):
             router = self._make_router(
                 case_number=case_input.case_number,
                 workspace_root=workspace_root,
@@ -287,6 +299,9 @@ class RunService:
                 json.dumps(report.model_dump(), ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+        else:
+            payload = json.loads(validation_report_path.read_text(encoding="utf-8"))
+            ValidationReport.model_validate(payload)
 
         _validate_required_output(short_description_path)
         _validate_required_output(traceability_map_path)
