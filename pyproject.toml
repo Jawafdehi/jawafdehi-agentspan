@@ -8,7 +8,7 @@ packages = [{include = "jawafdehi_agentspan", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-agentspan = "0.1.5"
+agentspan = "0.1.7"
 pydantic = "^2.12.5"
 pydantic-settings = "^2.11.0"
 typer = "^0.16.0"
