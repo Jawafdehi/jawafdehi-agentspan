@@ -19,6 +19,7 @@ from jawafdehi_agentspan.dependencies import (
     use_dependencies,
 )
 from jawafdehi_agentspan.evidence.contracts import TraceabilityEntry, ValidationReport
+from jawafdehi_agentspan.evidence.finalizer import ensure_missing_data_marker
 from jawafdehi_agentspan.logging_utils import configure_run_logging
 from jawafdehi_agentspan.models import (
     CaseInitialization,
@@ -271,6 +272,11 @@ class RunService:
     def _persist_payload_safe_artifacts(
         cls, workspace_root: Path, draft_final_path: Path
     ) -> None:
+        draft_markdown = draft_final_path.read_text(encoding="utf-8")
+        normalized_draft = ensure_missing_data_marker(draft_markdown)
+        if normalized_draft != draft_markdown:
+            draft_final_path.write_text(normalized_draft, encoding="utf-8")
+
         short_description_path = workspace_root / "short-description.txt"
         traceability_map_path = workspace_root / "traceability-map.json"
         validation_report_path = workspace_root / "validation-report.json"
@@ -293,15 +299,15 @@ class RunService:
                 encoding="utf-8",
             )
 
-        if not validation_report_path.is_file():
-            report = cls._build_validation_report(traceability_entries)
-            validation_report_path.write_text(
-                json.dumps(report.model_dump(), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-        else:
+        if validation_report_path.is_file():
             payload = json.loads(validation_report_path.read_text(encoding="utf-8"))
             ValidationReport.model_validate(payload)
+
+        report = cls._build_validation_report(traceability_entries)
+        validation_report_path.write_text(
+            json.dumps(report.model_dump(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
         _validate_required_output(short_description_path)
         _validate_required_output(traceability_map_path)

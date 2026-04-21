@@ -364,6 +364,30 @@ def test_run_service_writes_draft_final(tmp_path: Path):
     assert draft_path.stat().st_size > 0
 
 
+def test_run_service_injects_missing_data_marker_when_draft_lacks_it(tmp_path: Path):
+    initialization = _initialization(tmp_path)
+    source_bundle = _source_bundle(initialization)
+    settings = _isolated_settings(tmp_path)
+    executor = FakeExecutor()
+    executor._workspace_root = initialization.workspace.root_dir
+    executor._press_release_path = (
+        global_raw_sources_dir(initialization.case_number, settings)
+        / f"ciaa-press-release-{initialization.case_number}.pdf"
+    )
+    service = _service_with_executor(executor, source_bundle, settings)
+
+    result = service._run(
+        case_input=_case_input(initialization.case_number),
+        workspace_root=initialization.workspace.root_dir,
+        executor=executor,
+    )
+
+    assert result.published is True
+    draft_path = initialization.workspace.root_dir / "draft-final.md"
+    draft_content = draft_path.read_text(encoding="utf-8")
+    assert "not available from sources" in draft_content
+
+
 def test_run_service_falls_back_to_orchestrator_when_staged_flow_raises(
     tmp_path: Path,
 ):
