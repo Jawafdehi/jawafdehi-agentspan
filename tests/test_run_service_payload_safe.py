@@ -95,40 +95,6 @@ class _FakeExecutor:
                 for index, item in enumerate(self._sections)
             ]
             draft_path.write_text("\n".join(lines), encoding="utf-8")
-            (self.workspace_root / "traceability-map.json").write_text(
-                json.dumps(
-                    [
-                        {
-                            "claim_text": "Staged allegation",
-                            "section": "description",
-                            "source_refs": [
-                                {"source_id": "src-1", "chunk_id": "chunk-1"}
-                            ],
-                        }
-                    ],
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-        elif agent.name == "draft_short_description":
-            (self.workspace_root / "short-description.txt").write_text(
-                "Staged summary for 081-CR-0046.",
-                encoding="utf-8",
-            )
-            (self.workspace_root / "validation-report.json").write_text(
-                json.dumps(
-                    {
-                        "is_valid": True,
-                        "missing_sections": [],
-                        "unmapped_claims": [],
-                        "errors": [],
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
         return None
 
 
@@ -188,25 +154,37 @@ def test_run_service_persists_payload_safe_artifacts(tmp_path: Path) -> None:
     )
 
     assert result.case_id == 77
-    assert fake_executor.calls[:2] == ["prepare_information", "draft_section_title"]
-    assert fake_executor.calls[-1] == "draft_short_description"
+    assert fake_executor.calls == [
+        "prepare_information",
+        "draft_section_title",
+        "draft_section_key_allegations",
+        "draft_section_timeline",
+        "draft_section_description",
+        "draft_short_description",
+    ]
+
+    draft_final_path = workspace_root / "draft-final.md"
+    assert draft_final_path.is_file()
+    assert draft_final_path.read_text(encoding="utf-8").strip()
 
     short_description = (workspace_root / "short-description.txt").read_text(
         encoding="utf-8"
     ).strip()
     assert short_description
-    assert "Staged summary" in short_description
+    assert short_description == "Staged content 1"
 
     traceability_payload = json.loads(
         (workspace_root / "traceability-map.json").read_text(encoding="utf-8")
     )
     assert isinstance(traceability_payload, list)
-    assert traceability_payload
-    assert {"claim_text", "section", "source_refs"} <= set(traceability_payload[0])
 
     validation_payload = json.loads(
         (workspace_root / "validation-report.json").read_text(encoding="utf-8")
     )
-    assert {"is_valid", "missing_sections", "unmapped_claims", "errors"} <= set(
-        validation_payload
-    )
+    assert isinstance(validation_payload, dict)
+    assert {
+        "is_valid",
+        "missing_sections",
+        "unmapped_claims",
+        "errors",
+    } <= set(validation_payload)
