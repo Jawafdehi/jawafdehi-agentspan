@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "jawafdehi-mcp"
+version = "0.1.0"
+description = "MCP tool server for Jawafdehi API, NGM database, and document conversion"
+authors = ["Jawafdehi Inquiry <inquiry@jawafdehi.org>"]
+packages = [{include = "jawafdehi_mcp"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+httpx = "^0.28.1"
+markitdown = {extras = ["docx", "pdf", "pptx", "xlsx"], version = "^0.1.5"}
+mcp = ">=1.0.0"
+pydantic-settings = "^2.11.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

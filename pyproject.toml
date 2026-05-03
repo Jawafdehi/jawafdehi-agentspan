@@ -14,7 +14,7 @@ pydantic-settings = "^2.11.0"
 typer = "^0.16.0"
 httpx = "^0.28.1"
 markitdown = {extras = ["docx", "pdf", "pptx", "xlsx"], version = "^0.1.5"}
-jawafdehi-mcp = {path = "../jawafdehi-mcp", develop = true}
+jawafdehi-mcp = {path = "jawafdehi-mcp", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 hypothesis = "^6.148.2"
