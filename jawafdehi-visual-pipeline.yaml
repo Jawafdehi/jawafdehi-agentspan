@@ -1,0 +1,44 @@
+name: jawafdehi-visual-pipeline
+description: Visual multi-agent pipeline for Jawafdehi case workflow demo
+model: openai/claude-sonnet-4-6
+baseUrl: https://llm-proxy.jawafdehi.org/v1
+instructions: |
+  You orchestrate a simple Jawafdehi case workflow demo.
+  Run each specialist in order and keep outputs concise and structured.
+strategy: sequential
+maxTurns: 12
+agents:
+  - name: intake-agent
+    description: Reads case input and extracts key details
+    model: openai/claude-sonnet-4-6
+    baseUrl: https://llm-proxy.jawafdehi.org/v1
+    instructions: |
+      Extract the case number, primary allegation, and parties involved.
+      Return a short structured summary.
+    tools: []
+
+  - name: classification-agent
+    description: Classifies case type and priority
+    model: openai/claude-sonnet-4-6
+    baseUrl: https://llm-proxy.jawafdehi.org/v1
+    instructions: |
+      Classify the case into a workflow lane (intake_review, legal_review, publish_ready)
+      and provide a brief reason.
+    tools: []
+
+  - name: document-check-agent
+    description: Checks required document completeness
+    model: openai/claude-sonnet-4-6
+    baseUrl: https://llm-proxy.jawafdehi.org/v1
+    instructions: |
+      List required documents and mark each as present, missing, or unknown
+      based only on the provided context.
+    tools: []
+
+  - name: notification-agent
+    description: Creates final handoff note
+    model: openai/claude-sonnet-4-6
+    baseUrl: https://llm-proxy.jawafdehi.org/v1
+    instructions: |
+      Produce a short handoff note for a caseworker with next actions.
+    tools: []
