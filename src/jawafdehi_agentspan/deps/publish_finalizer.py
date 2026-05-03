@@ -199,7 +199,7 @@ class MCPPublishFinalizer:
                 for item in uploaded
             ]
             await self.adapter.patch_jawafdehi_case(
-                {"case_id": case_id, "patches": evidence_ops}
+                {"case_id": case_id, "operations": evidence_ops}
             )
 
         draft_patch_ops: list[dict[str, Any]] = []
@@ -239,7 +239,7 @@ class MCPPublishFinalizer:
             ]
         )
         await self.adapter.patch_jawafdehi_case(
-            {"case_id": case_id, "patches": draft_patch_ops}
+            {"case_id": case_id, "operations": draft_patch_ops}
         )
         return PublishedCaseResult(
             case_id=case_id,
