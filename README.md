@@ -39,3 +39,7 @@ poetry run pytest
 - `LLM_MODEL`
 - `OPENAI_BASE_URL`
 
+## License
+
+Licensed under the [Hippocratic License 3.0](./LICENSE), an [Ethical Source](https://ethicalsource.dev) license. See [LICENSING.md](./LICENSING.md) for details.
+
